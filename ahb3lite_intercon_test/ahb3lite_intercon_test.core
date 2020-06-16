@@ -1,0 +1,75 @@
+CAPI=2:
+name: ::ahb3lite_intercon_test:0.1
+description: Test AHB3lite intercon generation
+
+filesets:
+    rtl:
+        depend:
+            - ahb3lite_memory
+            - ahb3lite_mvec
+        files:
+            - rtl/intercon_test.sv
+        file_type : verilogSource
+        
+    ahb3lite_intercon_dep:
+        depend:
+            - ahb3lite_intercon
+            
+    verilator_tb:
+        files:
+            - bench/verilator/tb.cpp : {file_type : cppSource}
+        depend:
+            - verilator_tb_utils
+
+    constraints:
+        files:
+            - arty-a35t/arty.xdc : {file_type : xdc}
+            
+generate:
+    soc_intercon:
+        generator: ahb3lite_intercon_gen
+        parameters:
+            masters:
+                ahb3_mvec0:
+                    priority: 0
+                ahb3_mvec1:
+                    priority: 0
+            slaves:
+                ahb3_bram0:
+                    offset: 0
+                    size: 1024
+                ahb3_bram1:
+                    offset: 0x1000
+                    size: 1024
+
+targets:
+    sim:
+        default_tool: verilator
+        generate: [soc_intercon]
+        filesets: [ahb3lite_intercon_dep, rtl, verilator_tb]
+        toplevel: [intercon_test]
+        parameters: [build_synth=0]
+        tools:
+            verilator:
+                verilator_options: [-sv, --cc, --trace, --clk, CLK]
+                run_options: [--vcd=sim.vcd, --vcdstop=1200, --timeout=1200]
+                #run_options: [--vcd=sim.vcd]
+
+    synth: &synth
+        default_tool: vivado
+        generate: [soc_intercon]
+        filesets: [ahb3lite_intercon_dep, rtl, constraints]
+        toplevel: [intercon_test]
+        parameters: [build_synth=1]
+        tools:
+            vivado:
+                vivado-settings: /opt/xilinx/Vivado/2020.1/settings64.sh
+                part: xc7a35ticsg324-1L
+
+parameters:
+    build_synth:
+        datatype: int
+        description: Set build type
+        paramtype: vlogparam
+        scope: private
+        

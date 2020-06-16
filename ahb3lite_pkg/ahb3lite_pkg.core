@@ -1,0 +1,18 @@
+CAPI=2:
+name : ::ahb3lite_pkg:1.0
+
+filesets:
+    rtl:
+        files:
+                - rtl/verilog/ahb3lite_pkg.sv
+        file_type : verilogSource
+
+targets:
+    default:
+        filesets : [rtl]
+        
+provider:
+    name : github
+    user : RoaLogic
+    repo : ahb3lite_pkg
+    

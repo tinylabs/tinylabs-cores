@@ -1,0 +1,16 @@
+CAPI=2:
+name: ::ahb3lite_mvec:0.1
+description: AHB3 master read/write test vector
+
+filesets:
+    rtl:
+        depend:
+            - ahb3lite_pkg
+        files:
+            - rtl/ahb3lite_mvec.sv
+        file_type : verilogSource
+
+targets:
+    default:
+        filesets : [rtl]
+    

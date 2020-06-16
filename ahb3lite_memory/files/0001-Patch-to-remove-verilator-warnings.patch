@@ -1,0 +1,53 @@
+From e4a62c3a11ffe62c1ecbb0946746274f73ebba00 Mon Sep 17 00:00:00 2001
+From: Elliot Buller <elliot@tinylabs.io>
+Date: Tue, 16 Jun 2020 12:21:39 -0600
+Subject: [PATCH] Patch to remove verilator warnings
+
+---
+ rtl/verilog/ahb3lite_sram1rw.sv | 20 ++++++++++----------
+ 1 file changed, 10 insertions(+), 10 deletions(-)
+
+diff --git a/rtl/verilog/ahb3lite_sram1rw.sv b/rtl/verilog/ahb3lite_sram1rw.sv
+index f6d71d4..eb3fd31 100644
+--- a/rtl/verilog/ahb3lite_sram1rw.sv
++++ b/rtl/verilog/ahb3lite_sram1rw.sv
+@@ -167,18 +167,18 @@ module ahb3lite_sram1rw #(
+ 
+     //get number of active lanes for a 1024bit databus (max width) for this HSIZE
+     case (hsize)
+-       HSIZE_B1024: full_be = 'hffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff; 
+-       HSIZE_B512 : full_be = 'hffff_ffff_ffff_ffff;
+-       HSIZE_B256 : full_be = 'hffff_ffff;
+-       HSIZE_B128 : full_be = 'hffff;
+-       HSIZE_DWORD: full_be = 'hff;
+-       HSIZE_WORD : full_be = 'hf;
+-       HSIZE_HWORD: full_be = 'h3;
+-       default    : full_be = 'h1;
++       HSIZE_B1024: full_be = 128'hffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff;
++       HSIZE_B512 : full_be = 128'hffff_ffff_ffff_ffff;
++       HSIZE_B256 : full_be = 128'hffff_ffff;
++       HSIZE_B128 : full_be = 128'hffff;
++       HSIZE_DWORD: full_be = 128'hff;
++       HSIZE_WORD : full_be = 128'hf;
++       HSIZE_HWORD: full_be = 128'h3;
++       default    : full_be = 128'h1;
+     endcase
+ 
+     //generate masked address
+-    haddr_masked = haddr & address_offset();
++    haddr_masked = haddr[6:0] & address_offset();
+ 
+     //create byte-enable
+     gen_be = full_be[BE_SIZE-1:0] << haddr_masked;
+@@ -290,7 +290,7 @@ module ahb3lite_sram1rw #(
+ generate
+   if (REGISTERED_OUTPUT == "NO")
+   begin
+-      always_comb HREADYOUT <= 1'b1;
++      always_comb HREADYOUT = 1'b1;
+ 
+       always_comb HRDATA = contention ? dout_local : dout;
+   end
+-- 
+2.20.1
+

@@ -1,0 +1,31 @@
+CAPI=2:
+name: ::roalogic_memory:1.0
+description: Generate tech-specific memory
+
+filesets:
+    rtl:
+        files:
+            - rtl/verilog/rl_queue.sv
+            - rtl/verilog/rl_ram_1r1w.sv
+            - rtl/verilog/rl_ram_1r1w_easic_n3x.sv
+            - rtl/verilog/rl_ram_1r1w_easic_n3xs.sv
+            - rtl/verilog/rl_ram_1r1w_generic.sv
+            - rtl/verilog/rl_ram_1rw.sv
+            - rtl/verilog/rl_ram_1rw_easic_n3x.sv
+            - rtl/verilog/rl_ram_1rw_generic.sv
+        file_type : verilogSource
+
+    license:
+        files:
+            - LICENSE.txt
+        file_type : user
+
+targets:
+    default:
+        filesets : [rtl, license]
+
+provider:
+    name : github
+    user : RoaLogic
+    repo : memory
+    

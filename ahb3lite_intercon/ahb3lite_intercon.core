@@ -1,0 +1,34 @@
+CAPI=2:
+name: ::ahb3lite_intercon:1.1-r1
+description: Generate AHB3lite interconnect from memory map
+
+filesets:
+    rtl:
+        depend:
+            - ahb3lite_pkg
+        files:
+            - rtl/verilog/ahb3lite_interconnect.sv
+            - rtl/verilog/ahb3lite_interconnect_master_port.sv
+            - rtl/verilog/ahb3lite_interconnect_slave_port.sv
+            - rtl/verilog/ahb3lite_interconnect_slave_priority.sv    
+        file_type : verilogSource
+
+    license:
+        files:
+            - LICENSE.md
+        file_type : user
+
+targets:
+    default:
+        filesets : [rtl, license]
+
+generators:
+    ahb3lite_intercon_gen:
+        interpreter : python
+        command : sw/ahb3lite_intercon.py
+        
+provider:
+    name : github
+    user : tinylabs
+    repo : ahb3lite_interconnect
+    patches : [0001-Add-fusesoc-gen.patch]

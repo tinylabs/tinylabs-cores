@@ -1,0 +1,27 @@
+CAPI=2:
+name: ::ahb3lite_memory:1.0
+description: Generate AHB3lite memory
+
+filesets:
+    rtl:
+        depend:
+            - ahb3lite_pkg
+            - roalogic_memory
+        files:
+            - rtl/verilog/ahb3lite_sram1rw.sv
+        file_type : verilogSource
+
+    license:
+        files:
+            - LICENSE.md
+        file_type : user
+
+targets:
+    default:
+        filesets : [rtl, license]
+
+provider:
+    name : github
+    user : RoaLogic
+    repo : ahb3lite_memory
+    patches: [files/0001-Patch-to-remove-verilator-warnings.patch]
