@@ -1,0 +1,23 @@
+CAPI=2:
+name: ::cm3_core:1.0
+description: Cortex-M3 core wrapper
+
+filesets:
+    rtl:
+        depend:
+            - cm3_obs
+        files:
+            - rtl/cm3_core.sv
+            - rtl/cm3_excl_mon.sv
+        file_type : verilogSource
+
+targets:
+    default:
+        parameters: [XILINX_SYNTH=0]
+        filesets : [rtl]
+
+parameters:
+    XILINX_SYNTH:
+        datatype: int
+        description: Synthesize full cortex-m3 core in Vivado
+        paramtype: vlogparam

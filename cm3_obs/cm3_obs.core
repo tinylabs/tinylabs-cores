@@ -1,0 +1,22 @@
+CAPI=2:
+name: ::cm3_obs:1.0
+description: Cortex-M3 obsfucated synthesizable RTL
+
+filesets:
+    rtl:
+        files:
+            - m3designstart/logical/cortexm3integration_ds/verilog/cm3_code_mux.v
+            - m3designstart/logical/cortexm3integration_ds_obs/verilog/cortexm3ds_logic.v
+            - m3designstart/logical/cortexm3integration_ds_obs/verilog/CORTEXM3INTEGRATIONDS.v
+        file_type : verilogSource
+
+targets:
+    default:
+        filesets : [rtl]
+
+provider:
+    name : github
+    user : Grekery
+    repo : AT421-MN-80001-r0p0-02rel0
+    patches : [files/0001-Remove-verilator-warnings.patch]
+    

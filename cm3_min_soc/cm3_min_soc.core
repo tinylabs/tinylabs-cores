@@ -1,0 +1,84 @@
+CAPI=2:
+name: ::cm3_min_soc:0.1
+description: Minimal SoC using ARM Cortex-M3
+
+filesets:
+    rtl:
+        depend:
+            - cm3_core
+            - ahb3lite_memory
+        files:
+            - rtl/cm3_min_soc.sv
+        file_type : verilogSource
+        
+    ahb3lite_intercon_dep:
+        depend:
+            - ahb3lite_intercon
+            
+    verilator_tb:
+        files:
+            - bench/verilator/tb.cpp : {file_type : cppSource}
+        depend:
+            - verilator_tb_utils
+
+    constraints:
+        files:
+            - arty-a35t/arty.xdc : {file_type : xdc}
+            
+generate:
+    soc_intercon:
+        generator: ahb3lite_intercon_gen
+        parameters:
+            masters:
+                ahb3_cm3_code:
+                    priority: 0
+                ahb3_cm3_sys:
+                    priority: 0
+            slaves:
+                ahb3_rom:
+                    offset: 0
+                    size: 16384
+                ahb3_ram:
+                    offset: 0x20000000
+                    size: 16384
+
+targets:
+    sim:
+        default_tool: verilator
+        generate: [soc_intercon]
+        filesets: [ahb3lite_intercon_dep, rtl, verilator_tb]
+        toplevel: [cm3_min_soc]
+        parameters: [XILINX_SYNTH=0,ROM_SZ,RAM_SZ]
+        tools:
+            verilator:
+                verilator_options: [-sv, --cc, --trace, --clk, CLK]
+                run_options: [--vcd=sim.vcd, --vcdstop=500, --timeout=500, --bin-load=../../../boot.bin]
+
+    synth: &synth
+        default_tool: vivado
+        generate: [soc_intercon]
+        filesets: [ahb3lite_intercon_dep, rtl, constraints]
+        toplevel: [cm3_min_soc]
+        parameters: [XILINX_SYNTH=1,ROM_SZ,RAM_SZ]
+        tools:
+            vivado:
+                vivado-settings: /opt/xilinx/Vivado/2020.1/settings64.sh
+                part: xc7a35ticsg324-1L
+
+parameters:
+    XILINX_SYNTH:
+        datatype: int
+        description: Synthesize full cortex-m3 core in Vivado
+        paramtype: vlogparam
+
+    ROM_SZ:
+        datatype: int
+        default: 16384
+        description: Set size of ROM
+        paramtype: vlogparam
+
+    RAM_SZ:
+        datatype: int
+        default: 16384
+        description: Set size of RAM
+        paramtype: vlogparam

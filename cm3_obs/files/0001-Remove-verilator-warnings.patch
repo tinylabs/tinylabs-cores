@@ -1,0 +1,32 @@
+From f0a3126405bb4bca5f2e27277ca8c25556308c00 Mon Sep 17 00:00:00 2001
+From: Elliot Buller <elliot@tinylabs.io>
+Date: Wed, 17 Jun 2020 14:43:24 -0600
+Subject: [PATCH 1/1] Remove verilator warnings
+
+---
+ .../cortexm3integration_ds_obs/verilog/cortexm3ds_logic.v    | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/m3designstart/logical/cortexm3integration_ds_obs/verilog/cortexm3ds_logic.v b/m3designstart/logical/cortexm3integration_ds_obs/verilog/cortexm3ds_logic.v
+index b5e4b07..9ca5504 100644
+--- a/m3designstart/logical/cortexm3integration_ds_obs/verilog/cortexm3ds_logic.v
++++ b/m3designstart/logical/cortexm3integration_ds_obs/verilog/cortexm3ds_logic.v
+@@ -24,6 +24,9 @@
+ // Cortex-M3 DesignStart processor logic level
+ //------------------------------------------------------------------------------
+ 
++/* Disable verilator warnings just for this file */
++/* verilator lint_off WIDTH */
++/* verilator lint_off UNOPTFLAT */
+ module cortexm3ds_logic
+ (ISOLATEn, RETAINn, nTRST, SWCLKTCK, SWDITMS, TDI,
+ PORESETn, SYSRESETn, RSTBYPASS, CGBYPASS, FCLK, HCLK, TRACECLKIN, STCLK,
+@@ -94611,3 +94614,5 @@ endmodule
+ // EOF
+ //------------------------------------------------------------------------------
+ 
++/* verilator lint_on UNOPTFLAT */
++/* verilator lint_on WIDTH */
+-- 
+2.20.1
+
