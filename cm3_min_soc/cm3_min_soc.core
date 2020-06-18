@@ -21,6 +21,10 @@ filesets:
         depend:
             - verilator_tb_utils
 
+    scripts:
+        files:
+            - scripts/cortexm3sim.cfg : {file_type : user}
+            
     constraints:
         files:
             - arty-a35t/arty.xdc : {file_type : xdc}
@@ -46,7 +50,7 @@ targets:
     sim:
         default_tool: verilator
         generate: [soc_intercon]
-        filesets: [ahb3lite_intercon_dep, rtl, verilator_tb]
+        filesets: [ahb3lite_intercon_dep, rtl, scripts, verilator_tb]
         toplevel: [cm3_min_soc]
         parameters: [XILINX_SYNTH=0,ROM_SZ,RAM_SZ]
         tools:
