@@ -26,29 +26,60 @@ module fpga_top
    logic               hclk;
    logic               pll_locked;
    logic               pll_feedback;
-   
-   // Instantiate PLL to convert 100M to HCLK
-   PLLE2_BASE #(
-                .BANDWIDTH ("OPTIMIZED"),
-                .CLKFBOUT_MULT (12),
-                .CLKOUT0_DIVIDE(40),    // 30MHz
-                .CLKFBOUT_PHASE(0.0),   // Phase offset in degrees of CLKFB, (-360-360)
-                .CLKIN1_PERIOD(10.0),   // 100MHz input clock
-                .CLKOUT0_DUTY_CYCLE(0.5),
-                .CLKOUT0_PHASE(0.0),
-                .DIVCLK_DIVIDE(1),    // Master division value , (1-56)
-                .REF_JITTER1(0.0),    // Reference input jitter in UI (0.000-0.999)
-                .STARTUP_WAIT("FALSE") // Delay DONE until PLL Locks, ("TRUE"/"FALSE")
-                ) genclock (
-                            // Clock outputs: 1-bit (each) output
-                            .CLKOUT0(hclk),
-                            .CLKFBOUT(pll_feedback), // 1-bit output, feedback clock
-                            .LOCKED(pll_locked),
-                            .CLKIN1(CLK_100M),
-                            .PWRDWN(1'b0),
-                            .RST(1'b0),
-                            .CLKFBIN(pll_feedback)    // 1-bit input, feedback clock
-                            );
+
+   generate
+      if (XILINX_SYNTH) begin : gen_pll
+         
+         // Full CM3 core can support HCLK=50MHz
+         PLLE2_BASE #(
+                      .BANDWIDTH ("OPTIMIZED"),
+                      .CLKFBOUT_MULT (10),
+                      .CLKOUT0_DIVIDE(20),    // 50MHz
+                      .CLKFBOUT_PHASE(0.0),   // Phase offset in degrees of CLKFB, (-360-360)
+                      .CLKIN1_PERIOD(10.0),   // 100MHz input clock
+                      .CLKOUT0_DUTY_CYCLE(0.5),
+                      .CLKOUT0_PHASE(0.0),
+                      .DIVCLK_DIVIDE(1),    // Master division value , (1-56)
+                      .REF_JITTER1(0.0),    // Reference input jitter in UI (0.000-0.999)
+                      .STARTUP_WAIT("FALSE") // Delay DONE until PLL Locks, ("TRUE"/"FALSE")
+                      ) genclock (
+                                  // Clock outputs: 1-bit (each) output
+                                  .CLKOUT0(hclk),
+                                  .CLKFBOUT(pll_feedback), // 1-bit output, feedback clock
+                                  .LOCKED(pll_locked),
+                                  .CLKIN1(CLK_100M),
+                                  .PWRDWN(1'b0),
+                                  .RST(1'b0),
+                                  .CLKFBIN(pll_feedback)    // 1-bit input, feedback clock
+                                  );
+      end // block: gen_pll
+      else begin : gen_pll
+
+         // Obsfucated CM3 core can only support 30MHz HCLK
+         PLLE2_BASE #(
+                      .BANDWIDTH ("OPTIMIZED"),
+                      .CLKFBOUT_MULT (12),
+                      .CLKOUT0_DIVIDE(40),    // 50MHz
+                      .CLKFBOUT_PHASE(0.0),   // Phase offset in degrees of CLKFB, (-360-360)
+                      .CLKIN1_PERIOD(10.0),   // 100MHz input clock
+                      .CLKOUT0_DUTY_CYCLE(0.5),
+                      .CLKOUT0_PHASE(0.0),
+                      .DIVCLK_DIVIDE(1),    // Master division value , (1-56)
+                      .REF_JITTER1(0.0),    // Reference input jitter in UI (0.000-0.999)
+                      .STARTUP_WAIT("FALSE") // Delay DONE until PLL Locks, ("TRUE"/"FALSE")
+                      ) genclock (
+                                  // Clock outputs: 1-bit (each) output
+                                  .CLKOUT0(hclk),
+                                  .CLKFBOUT(pll_feedback), // 1-bit output, feedback clock
+                                  .LOCKED(pll_locked),
+                                  .CLKIN1(CLK_100M),
+                                  .PWRDWN(1'b0),
+                                  .RST(1'b0),
+                                  .CLKFBIN(pll_feedback)    // 1-bit input, feedback clock
+                                  );
+
+      end
+   endgenerate
 
    // Generate reset logic from pushbutton/pll
    logic               poreset_n, cpureset_n;

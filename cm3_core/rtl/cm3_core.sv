@@ -176,11 +176,142 @@ module cm3_core #(
    generate
       if (XILINX_SYNTH) begin : gen_cm3
          
+         // Instantiate encrypted xilinx core
+         CORTEXM3INTEGRATION
+           u_cm3_full (
+                      // Clocks
+                      .FCLK        (FCLK),
+                      .HCLK        (HCLK),
+                      .TRACECLKIN  (HCLK),
+                      .STCLK       (1'b1), // Not actual clock
+                      
+                      // Reset
+                      .PORESETn    (PORESETn),
+                      .SYSRESETn   (CPURESETn),
+                      .SYSRESETREQ (SYSRESETREQ),
+                      
+                      // Interrupts
+                      .INTISR      (INTISR),
+                      .INTNMI      (INTNMI),
+                      .AUXFAULT    (32'h0),
+                      
+                      // Debug
+                      .SWCLKTCK    (SWCLKTCK),
+                      .nTRST       (nTRST),
+                      .SWDITMS     (SWDITMS),
+                      .TDI         (TDI),
+                      .TDO         (TDO),
+                      .nTDOEN      (nTDOEN),
+                      .SWV         (SWV),
+                      .SWDO        (SWDO),
+                      .SWDOEN      (SWDOEN),
+                      .JTAGNSW     (JTAGNSW),
+                      
+                      // Power management
+                      .CDBGPWRUPREQ (cdbgpwrup),
+                      .CDBGPWRUPACK (cdbgpwrup),
+                      .EDBGRQ       (1'b0),      // What is this?
+                      .DBGRESTART   (1'b0),      // Multiproc debug support?
+                      .DBGRESTARTED (),
+                      .ISOLATEn     (1'b1),      // Isolate core power domain
+                      .RETAINn      (1'b1),      // Retain state in power down
+                      
+                      // Wakeup controller
+                      .WICENREQ     (1'b0),      // Wakeup req from PMIC?
+                      .WICENACK     (),
+                      .WAKEUP       (),
+                      
+                      // Clock gating/bypass
+                      .CGBYPASS     (1'b0),
+                      .RSTBYPASS    (1'b0),
+                      .GATEHCLK     (),
+                      
+                      // Miscellaneous
+                      .SE            (1'b0),     // Scan enable?
+                      .BIGEND        (1'b0),     // Always little endian
+                      .STCALIB       (26'h0),    // Systick calib
+                      .FIXMASTERTYPE (1'b1),     // Needs to be 1
+                      .TSVALUEB      (48'h0),    // TPIU timestamp
+                      .MPUDISABLE    (1'b0),
+                      .DBGEN         (1'b1),
+                      .TXEV          (),         // TX event output
+                      .RXEV          (1'b0),     // RX event input
+                      
+                      // Traceport - unused
+                      .TRACEDATA     (),
+                      .TRCENA        (),
+                      .TRACECLK      (),
+                      
+                      // HTM data - Not used
+                      .HTMDHADDR     (),
+                      .HTMDHTRANS    (),
+                      .HTMDHSIZE     (),
+                      .HTMDHBURST    (),
+                      .HTMDHPROT     (),
+                      .HTMDHWDATA    (),
+                      .HTMDHWRITE    (),
+                      .HTMDHRDATA    (),
+                      .HTMDHREADY    (),
+                      .HTMDHRESP     (),
+            
+                      // Core status
+                      .HALTED        (HALTED),     // Halted for debug
+                      .LOCKUP        (LOCKUP),     // Core is locked up
+                      .BRCHSTAT      (),
+                      .SLEEPING      (),
+                      .SLEEPDEEP     (),
+                      .SLEEPHOLDREQn (1'b1),
+                      .SLEEPHOLDACKn (),
+                      .ETMINTNUM     (),           // Current active interrupt
+                      .ETMINTSTAT    (),           // Interrupt activation status
+                      .CURRPRI       (),           // Current interrupt priority
 
-         // TODO : Determine instantiation name inside cortexm3_integration.v
-         //        Extract encrypted files from AT426 via fusesoc generator
-         //        Vivado should happily decrypt as long as we call with the
-         //        correct arguments.
+                      // ICODE AHB-lite bus
+                      .IFLUSH        (1'b0),       // Force icode flush?
+                      .HREADYI       (hreadyi),
+                      .HRDATAI       (hrdatai),
+                      .HRESPI        (hrespi),
+                      .HTRANSI       (htransi),
+                      .HSIZEI        (hsizei),
+                      .HADDRI        (haddri),
+                      .HBURSTI       (hbursti),
+                      .HPROTI        (hproti),
+                      .MEMATTRI      (memattri),
+                      
+                      // DCODE AHB-lite bus
+                      .HMASTERD      (hmasterd),
+                      .HREADYD       (hreadyd),
+                      .HRDATAD       (hrdatad),
+                      .HRESPD        (hrespd),
+                      .HTRANSD       (htransd),
+                      .HSIZED        (hsized),
+                      .HADDRD        (haddrd),
+                      .HBURSTD       (hburstd),
+                      .HPROTD        (hprotd),
+                      .HWRITED       (hwrited),
+                      .HWDATAD       (hwdatad),
+                      .MEMATTRD      (memattrd),
+                      .EXREQD        (exreqd),
+                      .EXRESPD       (exrespd),
+                  
+                      // System AHB-lite bus
+                      .HREADYS       (sys_HREADY),
+                      .HRDATAS       (sys_HRDATA),
+                      .HRESPS        ({1'b0, sys_HRESP}),
+                      .HTRANSS       (sys_HTRANS),
+                      .HSIZES        (sys_HSIZE),
+                      .HADDRS        (sys_HADDR),
+                      .HBURSTS       (sys_HBURST),
+                      .HPROTS        (sys_HPROT),
+                      .HWRITES       (hwrites),
+                      .HWDATAS       (sys_HWDATA),
+                      .HMASTLOCKS    (sys_HMASTLOCK),
+                      .HMASTERS      (hmasters),
+                      .MEMATTRS      (memattrs),
+                      .EXREQS        (exreqs),
+                      .EXRESPS       (exresps)                  
+                      );
+
       end
       else begin : gen_cm3
          

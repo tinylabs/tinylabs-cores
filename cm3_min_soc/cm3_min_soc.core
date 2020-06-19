@@ -11,6 +11,8 @@ filesets:
             - rtl/cm3_min_soc.sv : {file_type : verilogSource}
 
     fpga_top:
+        #depend:
+        #    - cm3_full  # Uncomment for XILINX_SYNTH=1    
         files:
             - rtl/fpga_top.sv : {file_type : verilogSource}
             

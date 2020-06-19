@@ -1,0 +1,46 @@
+CAPI=2:
+name: ::cm3_full:0.1
+description: Cortex-M3 Xilinx encrypted RTL
+
+filesets:
+    rtl:
+        files:
+            - AT426-BU-98000-r0p1-00rel0/vivado/Arm_ipi_repository/CM3DbgAXI/rtl/cm3_mpu.v
+            - AT426-BU-98000-r0p1-00rel0/vivado/Arm_ipi_repository/CM3DbgAXI/rtl/cortexm3.v
+            - AT426-BU-98000-r0p1-00rel0/vivado/Arm_ipi_repository/CM3DbgAXI/rtl/cm3_fpb.v
+            - AT426-BU-98000-r0p1-00rel0/vivado/Arm_ipi_repository/CM3DbgAXI/rtl/models.v
+            - AT426-BU-98000-r0p1-00rel0/vivado/Arm_ipi_repository/CM3DbgAXI/rtl/cm3_etm.v
+            - AT426-BU-98000-r0p1-00rel0/vivado/Arm_ipi_repository/CM3DbgAXI/rtl/cm3_wic.v
+            - AT426-BU-98000-r0p1-00rel0/vivado/Arm_ipi_repository/CM3DbgAXI/rtl/cm3_bus_matrix.v
+            - AT426-BU-98000-r0p1-00rel0/vivado/Arm_ipi_repository/CM3DbgAXI/rtl/cm3_dpu.v
+            - AT426-BU-98000-r0p1-00rel0/vivado/Arm_ipi_repository/CM3DbgAXI/rtl/cm3_dwt.v
+            - AT426-BU-98000-r0p1-00rel0/vivado/Arm_ipi_repository/CM3DbgAXI/rtl/dapswjdp.v
+            - AT426-BU-98000-r0p1-00rel0/vivado/Arm_ipi_repository/CM3DbgAXI/rtl/cm3_tpiu.v
+            - AT426-BU-98000-r0p1-00rel0/vivado/Arm_ipi_repository/CM3DbgAXI/rtl/cortexm3_integration.v
+            - AT426-BU-98000-r0p1-00rel0/vivado/Arm_ipi_repository/CM3DbgAXI/rtl/cm3_dap_ahb_ap.v
+            - AT426-BU-98000-r0p1-00rel0/vivado/Arm_ipi_repository/CM3DbgAXI/rtl/cmsdk.v
+            - AT426-BU-98000-r0p1-00rel0/vivado/Arm_ipi_repository/CM3DbgAXI/rtl/cm3_nvic.v
+            - AT426-BU-98000-r0p1-00rel0/vivado/Arm_ipi_repository/CM3DbgAXI/rtl/cm3_itm.v
+            - AT426-BU-98000-r0p1-00rel0/vivado/Arm_ipi_repository/CM3DbgAXI/rtl/cm3_mpu_defs.vp : {is_include_file : true}
+            - AT426-BU-98000-r0p1-00rel0/vivado/Arm_ipi_repository/CM3DbgAXI/rtl/cm3_dpu_defs.vp : {is_include_file : true}
+            - AT426-BU-98000-r0p1-00rel0/vivado/Arm_ipi_repository/CM3DbgAXI/rtl/cm3_nvic_defs.vp : {is_include_file : true}
+            - AT426-BU-98000-r0p1-00rel0/vivado/Arm_ipi_repository/CM3DbgAXI/rtl/cm3_mtx_undefs.vp : {is_include_file : true}
+            - AT426-BU-98000-r0p1-00rel0/vivado/Arm_ipi_repository/CM3DbgAXI/rtl/cm3_nvic_undefs.vp : {is_include_file : true}
+            - AT426-BU-98000-r0p1-00rel0/vivado/Arm_ipi_repository/CM3DbgAXI/rtl/cm3_etm_undefs.vp : {is_include_file : true}
+            - AT426-BU-98000-r0p1-00rel0/vivado/Arm_ipi_repository/CM3DbgAXI/rtl/cm3_mpu_undefs.vp : {is_include_file : true}
+            - AT426-BU-98000-r0p1-00rel0/vivado/Arm_ipi_repository/CM3DbgAXI/rtl/cm3_dap_ahb_ap_defs.vp : {is_include_file : true}
+            - AT426-BU-98000-r0p1-00rel0/vivado/Arm_ipi_repository/CM3DbgAXI/rtl/cm3_fpb_undefs.vp : {is_include_file : true}
+            - AT426-BU-98000-r0p1-00rel0/vivado/Arm_ipi_repository/CM3DbgAXI/rtl/cm3_dpu_undefs.vp : {is_include_file : true}
+            - AT426-BU-98000-r0p1-00rel0/vivado/Arm_ipi_repository/CM3DbgAXI/rtl/cm3_tpiu_defs.vp : {is_include_file : true}
+            - AT426-BU-98000-r0p1-00rel0/vivado/Arm_ipi_repository/CM3DbgAXI/rtl/cm3_etm_defs.vp : {is_include_file : true}
+            - AT426-BU-98000-r0p1-00rel0/vivado/Arm_ipi_repository/CM3DbgAXI/rtl/cm3_dap_ahb_ap_undefs.vp : {is_include_file : true}
+            - AT426-BU-98000-r0p1-00rel0/vivado/Arm_ipi_repository/CM3DbgAXI/rtl/cm3_dwt_defs.vp : {is_include_file : true}
+            - AT426-BU-98000-r0p1-00rel0/vivado/Arm_ipi_repository/CM3DbgAXI/rtl/cm3_mtx_defs.vp : {is_include_file : true}
+            - AT426-BU-98000-r0p1-00rel0/vivado/Arm_ipi_repository/CM3DbgAXI/rtl/cm3_dwt_undefs.vp : {is_include_file : true}
+            - AT426-BU-98000-r0p1-00rel0/vivado/Arm_ipi_repository/CM3DbgAXI/rtl/cm3_fpb_defs.vp : {is_include_file : true}
+        file_type : verilogSource
+
+targets:
+    default:
+        filesets : [rtl]
+    
