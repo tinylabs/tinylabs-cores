@@ -8,18 +8,21 @@ filesets:
             - cm3_core
             - ahb3lite_memory
         files:
-            - rtl/cm3_min_soc.sv
-        file_type : verilogSource
-        
+            - rtl/cm3_min_soc.sv : {file_type : verilogSource}
+
+    fpga_top:
+        files:
+            - rtl/fpga_top.sv : {file_type : verilogSource}
+            
     ahb3lite_intercon_dep:
         depend:
             - ahb3lite_intercon
             
     verilator_tb:
-        files:
-            - bench/verilator/tb.cpp : {file_type : cppSource}
         depend:
             - verilator_tb_utils
+        files:
+            - bench/verilator/tb.cpp : {file_type : cppSource}
 
     scripts:
         files:
@@ -56,14 +59,15 @@ targets:
         tools:
             verilator:
                 verilator_options: [-sv, --cc, --trace, --clk, CLK]
+                make_options: [OPT_FAST=-Ofast]
                 run_options: [--vcd=sim.vcd, --vcdstop=500, --timeout=500, --bin-load=../../../boot.bin]
 
     synth: &synth
         default_tool: vivado
         generate: [soc_intercon]
-        filesets: [ahb3lite_intercon_dep, rtl, constraints]
-        toplevel: [cm3_min_soc]
-        parameters: [XILINX_SYNTH=1,ROM_SZ,RAM_SZ]
+        filesets: [ahb3lite_intercon_dep, rtl, fpga_top, constraints]
+        toplevel: [fpga_top]
+        parameters: [XILINX_SYNTH=0,ROM_SZ,RAM_SZ]
         tools:
             vivado:
                 vivado-settings: /opt/xilinx/Vivado/2020.1/settings64.sh

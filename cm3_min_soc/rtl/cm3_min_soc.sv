@@ -8,8 +8,8 @@
 module cm3_min_soc
   #(
     parameter XILINX_SYNTH = 0,
-     parameter ROM_SZ = (16384),
-     parameter RAM_SZ = (16384)
+    parameter ROM_SZ = (16384),
+    parameter RAM_SZ = (16384)
   ) (
      // Clock and reset
      input  CLK,
@@ -17,10 +17,12 @@ module cm3_min_soc
      input  CPURESETn,
      
      // JTAG to cm3
-     input  TCK,
+     input  TCK_SWDCLK,
      input  TDI,
+     input  TMS_SWDIN,
      output TDO,
-     input  TMS
+     output SWDOUT,
+     output SWDOUTEN
    );
    
    // Include generated AHB3lite interconnect crossbar
@@ -106,10 +108,10 @@ module cm3_min_soc
             .INTNMI       (1'b0),
             
             // Debug
-            .SWCLKTCK     (TCK),
-            .SWDITMS      (TMS),
-            .SWDO         (),
-            .SWDOEN       (),
+            .SWCLKTCK     (TCK_SWDCLK),
+            .SWDITMS      (TMS_SWDIN),
+            .SWDO         (SWDOUT),
+            .SWDOEN       (SWDOUTEN),
             .nTRST        (1'b1),
             .TDI          (TDI),
             .TDO          (TDO),
