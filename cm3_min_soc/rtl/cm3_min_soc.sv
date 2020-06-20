@@ -7,7 +7,7 @@
 
 module cm3_min_soc
   #(
-    parameter XILINX_SYNTH = 0,
+    parameter XILINX_ENC_CM3 = 0,
     parameter ROM_SZ = (16384),
     parameter RAM_SZ = (16384)
   ) (
@@ -16,7 +16,7 @@ module cm3_min_soc
      input  RESETn,
      input  CPURESETn,
      
-     // JTAG to cm3
+     // JTAG/SWD
      input  TCK_SWDCLK,
      input  TDI,
      input  TMS_SWDIN,
@@ -92,8 +92,8 @@ module cm3_min_soc
    // Instantiate cortex-m3 core
    cm3_core
      #(
-       .XILINX_SYNTH  (XILINX_SYNTH),
-       .NUM_IRQ       (16)
+       .XILINX_ENC_CM3  (XILINX_ENC_CM3),
+       .NUM_IRQ         (16)
        )
      u_cm3 (
             // Clock and reset

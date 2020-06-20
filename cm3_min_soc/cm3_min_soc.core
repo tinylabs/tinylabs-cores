@@ -11,10 +11,12 @@ filesets:
             - rtl/cm3_min_soc.sv : {file_type : verilogSource}
 
     fpga_top:
-        #depend:
-        #    - cm3_full  # Uncomment for XILINX_SYNTH=1    
         files:
             - rtl/fpga_top.sv : {file_type : verilogSource}
+
+    cm3_full_dep:
+        depend:
+            - cm3_full
             
     ahb3lite_intercon_dep:
         depend:
@@ -26,11 +28,12 @@ filesets:
         files:
             - bench/verilator/tb.cpp : {file_type : cppSource}
 
-    scripts:
+    support:
         files:
             - scripts/cortexm3sim.cfg : {file_type : user}
+            - fw/blinky.bin : {file_type : user}
             
-    constraints:
+    arty_constraints:
         files:
             - arty-a35t/arty.xdc : {file_type : xdc}
             
@@ -52,33 +55,50 @@ generate:
                     size: 16384
 
 targets:
-    sim:
-        default_tool: verilator
+    default: &base
         generate: [soc_intercon]
-        filesets: [ahb3lite_intercon_dep, rtl, scripts, verilator_tb]
+        filesets: [ahb3lite_intercon_dep, rtl, support]
+        parameters: [XILINX_ENC_CM3=0,ROM_SZ,RAM_SZ]
+
+    sim:
+        <<: *base
+        description: Simulate CM3 SoC using verilator
+        default_tool: verilator
+        filesets_append: [verilator_tb]
         toplevel: [cm3_min_soc]
-        parameters: [XILINX_SYNTH=0,ROM_SZ,RAM_SZ]
         tools:
             verilator:
                 verilator_options: [-sv, --cc, --trace, --clk, CLK]
-                make_options: [OPT_FAST=-Ofast]
-                run_options: [--vcd=sim.vcd, --vcdstop=500, --timeout=500, --bin-load=../../../boot.bin]
+                #make_options: [OPT_FAST=-Ofast]
+                run_options: [--vcd=sim.vcd, --vcdstop=500, --timeout=500, --bin-load=../src/cm3_min_soc_0.1/fw/blinky.bin]
 
-    synth: &synth
+    synth_arty:
+        <<: *base
+        description: Synthesize obsfucated CM3 SoC for Digilent Arty-A35T (30MHz)
         default_tool: vivado
-        generate: [soc_intercon]
-        filesets: [ahb3lite_intercon_dep, rtl, fpga_top, constraints]
+        filesets_append: [fpga_top, arty_constraints]
         toplevel: [fpga_top]
-        parameters: [XILINX_SYNTH=0,ROM_SZ,RAM_SZ]
         tools:
             vivado:
-                vivado-settings: /opt/xilinx/Vivado/2020.1/settings64.sh
                 part: xc7a35ticsg324-1L
+                vivado-settings: /opt/xilinx/Vivado/2020.1/settings64.sh
 
+    synth_arty_full:
+        <<: *base
+        description: Synthesize encrypted CM3 SoC for Digilent Arty-A35T (50MHz)
+        default_tool: vivado
+        filesets_append: [fpga_top, cm3_full_dep, arty_constraints]
+        parameters: [XILINX_ENC_CM3=1]
+        toplevel: [fpga_top]
+        tools:
+            vivado:
+                part: xc7a35ticsg324-1L
+                vivado-settings: /opt/xilinx/Vivado/2020.1/settings64.sh
+        
 parameters:
-    XILINX_SYNTH:
+    XILINX_ENC_CM3:
         datatype: int
-        description: Synthesize full cortex-m3 core in Vivado
+        description: Synthesize encrypted cortex-m3 core in Vivado
         paramtype: vlogparam
 
     ROM_SZ:

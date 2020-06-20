@@ -5,17 +5,17 @@
  *  2020
  *
  * Parameters:
- *   NUM_IRQ - Number of IRQs to core (fixed if XILINX_SYNTH not defined)
+ *   NUM_IRQ - Number of IRQs to core (fixed if XILINX_ENC_CM3 not defined)
  * 
  * Defines:
- *   XILINX_SYNTH - Define to synthesize full core for xilinx (using encrypted IP)
+ *   XILINX_ENC_CM3 - Define to synthesize full core for xilinx (using encrypted IP)
  *                  This should be faster and allow full IRQ use
  *                  Default is fixed obsfucated core (fixed @ 16 IRQs)
  **/
 
 module cm3_core #(
                   parameter NUM_IRQ = 16,
-                  parameter XILINX_SYNTH = 0
+                  parameter XILINX_ENC_CM3 = 0
                   )
    (
     // Clock and reset
@@ -174,12 +174,15 @@ module cm3_core #(
    
    // Instantiate core wrapper
    generate
-      if (XILINX_SYNTH) begin : gen_cm3
+      if (XILINX_ENC_CM3) begin : gen_cm3
          
          // Instantiate encrypted xilinx core
          CORTEXM3INTEGRATION
-           u_cm3_full (
-                      // Clocks
+           #(
+             .NUM_IRQ   (NUM_IRQ)
+             )
+         u_cm3_full (
+                     // Clocks
                       .FCLK        (FCLK),
                       .HCLK        (HCLK),
                       .TRACECLKIN  (HCLK),

@@ -13,11 +13,4 @@ filesets:
 
 targets:
     default:
-        parameters: [XILINX_SYNTH=0]
         filesets : [rtl]
-
-parameters:
-    XILINX_SYNTH:
-        datatype: int
-        description: Synthesize full cortex-m3 core in Vivado
-        paramtype: vlogparam

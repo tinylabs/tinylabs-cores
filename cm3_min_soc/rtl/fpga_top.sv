@@ -8,7 +8,7 @@
 
 module fpga_top 
   #(
-    parameter XILINX_SYNTH = 0,
+    parameter XILINX_ENC_CM3 = 0,
     parameter ROM_SZ = 16384,
     parameter RAM_SZ = 16384
     )(
@@ -28,7 +28,7 @@ module fpga_top
    logic               pll_feedback;
 
    generate
-      if (XILINX_SYNTH) begin : gen_pll
+      if (XILINX_ENC_CM3) begin : gen_pll
          
          // Full CM3 core can support HCLK=50MHz
          PLLE2_BASE #(
@@ -101,7 +101,7 @@ module fpga_top
    // Instantiate soc
    cm3_min_soc
      #(
-       .XILINX_SYNTH    (XILINX_SYNTH),
+       .XILINX_ENC_CM3  (XILINX_ENC_CM3),
        .ROM_SZ          (ROM_SZ),
        .RAM_SZ          (RAM_SZ)
        )

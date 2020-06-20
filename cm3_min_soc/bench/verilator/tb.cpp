@@ -92,7 +92,7 @@ int main(int argc, char **argv, char **env)
 
 		top->eval();
         top->CLK = !top->CLK;
-		tbUtils->doJTAG(&top->TMS, &top->TDI, &top->TCK, top->TDO);
+		tbUtils->doJTAG(&top->TMS_SWDIN, &top->TDI, &top->TCK_SWDCLK, top->TDO);
 	}
 
 	//printf("Simulation ended at PC = %08x (%lu)\n",
