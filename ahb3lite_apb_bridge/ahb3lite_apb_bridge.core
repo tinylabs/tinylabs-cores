@@ -1,0 +1,25 @@
+CAPI=2:
+name: ::ahb3lite_apb_bridge:1.0
+description: Bridge AHB3 slave to APB4 master
+
+filesets:
+    rtl:
+        depend:
+            - ahb3lite_pkg
+        files:
+            - rtl/verilog/ahb3lite_apb_bridge.sv : {file_type : verilogSource}
+
+    license:
+        files:
+            - LICENSE.md : {file_type : user}
+
+targets:
+    default:
+        filesets : [rtl, license]
+
+provider:
+    name : github
+    user : RoaLogic
+    repo : ahb3lite_apb_bridge
+    patches : [files/0001-Fix-verilator-warnings.patch]
+    

@@ -18,7 +18,9 @@ module fpga_top
       input  TCK_SWDCLK,
       input  TDI,
       inout  TMS_SWDIO,
-      output TDO
+      output TDO,
+      // LED output
+      output LED
       );
 
 
@@ -94,7 +96,7 @@ module fpga_top
    assign poreset_n = (reset_ctr > 10) ? 0 : 1;
    assign cpureset_n = reset_ctr ? 0 : 1;
    
-   // Tristate output when not enabled
+   // Inferred BUFIO on SWDIO
    logic               swdoe, swdout;
    assign TMS_SWDIO = swdoe ? swdout : 1'bz;
 
@@ -114,7 +116,8 @@ module fpga_top
           .TMS_SWDIN  (TMS_SWDIO),
           .TDO        (TDO),
           .SWDOUT     (swdout),
-          .SWDOUTEN   (swdoe)
+          .SWDOUTEN   (swdoe),
+          .LED        (LED)
           );
    
 endmodule // fpga_top

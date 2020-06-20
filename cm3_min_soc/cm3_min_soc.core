@@ -7,6 +7,8 @@ filesets:
         depend:
             - cm3_core
             - ahb3lite_memory
+            - ahb3lite_apb_bridge
+            - apb4_gpio
         files:
             - rtl/cm3_min_soc.sv : {file_type : verilogSource}
 
@@ -32,6 +34,7 @@ filesets:
         files:
             - scripts/cortexm3sim.cfg : {file_type : user}
             - fw/blinky.bin : {file_type : user}
+            - fw/blinky_sim.bin : {file_type : user}
             
     arty_constraints:
         files:
@@ -49,10 +52,13 @@ generate:
             slaves:
                 ahb3_rom:
                     offset: 0
-                    size: 16384
+                    size:   16384
                 ahb3_ram:
                     offset: 0x20000000
-                    size: 16384
+                    size:   16384
+                ahb3_apb_brg:
+                    offset: 0x40000000
+                    size:   16
 
 targets:
     default: &base
@@ -70,7 +76,7 @@ targets:
             verilator:
                 verilator_options: [-sv, --cc, --trace, --clk, CLK]
                 #make_options: [OPT_FAST=-Ofast]
-                run_options: [--vcd=sim.vcd, --vcdstop=500, --timeout=500, --bin-load=../src/cm3_min_soc_0.1/fw/blinky.bin]
+                run_options: [--vcd=sim.vcd, --timeout=1000, --bin-load=../src/cm3_min_soc_0.1/fw/blinky_sim.bin]
 
     synth_arty:
         <<: *base

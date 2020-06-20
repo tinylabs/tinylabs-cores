@@ -12,27 +12,48 @@ module cm3_min_soc
     parameter RAM_SZ = (16384)
   ) (
      // Clock and reset
-     input  CLK,
-     input  RESETn,
-     input  CPURESETn,
+     input        CLK,
+     input        RESETn,
+     input        CPURESETn,
      
      // JTAG/SWD
-     input  TCK_SWDCLK,
-     input  TDI,
-     input  TMS_SWDIN,
-     output TDO,
-     output SWDOUT,
-     output SWDOUTEN
+     input        TCK_SWDCLK,
+     input        TDI,
+     input        TMS_SWDIN,
+     output       TDO,
+     output       SWDOUT,
+     output       SWDOUTEN,
+
+     // 1-bit gpio output
+     output logic LED
    );
    
    // Include generated AHB3lite interconnect crossbar
 `include "ahb3lite_intercon.vh"
+
+   // APB4 local bus
+   // TODO: Create generator so more peripherals can be added via mux generation
+   localparam  APB4_PDATA_SIZE = 8;
+   localparam  APB4_PADDR_SIZE = 8;
+   logic                           apb4_PSEL, apb4_PENABLE, apb4_PWRITE, apb4_PREADY, apb4_PSLVERR;
+   logic [2:0]                     apb4_PPROT;
+   logic [(APB4_PDATA_SIZE/8)-1:0] apb4_PSTRB;
+   logic [APB4_PADDR_SIZE-1:0]     apb4_PADDR;
+   logic [APB4_PADDR_SIZE-1:0]     apb4_PWDATA;
+   logic [APB4_PADDR_SIZE-1:0]     apb4_PRDATA;
+   
+   // GPIO port
+   logic [APB4_PDATA_SIZE-1:0]     gpio_i, gpio_o, gpio_oe;
+   logic                           irq_o;
    
    // IRQs to cm3 core
    logic [15:0] irq;
    
    // Disable IRQs on minimal implementation
    assign irq = 16'h0;
+
+   // Just use output for LED
+   assign LED = gpio_oe[0] ? gpio_o[0] : 1'b0;
    
    // Instantiate ROM
    ahb3lite_sram1rw
@@ -83,8 +104,70 @@ module cm3_min_soc
                 .HREADY    (ahb3_ram_HREADY),
                 .HRESP     (ahb3_ram_HRESP)
                 );
-   
 
+   // Instantiate AHB3 <=> APB4 bridge
+   ahb3lite_apb_bridge
+     #(
+       .HADDR_SIZE    (32),
+       .HDATA_SIZE    (32),
+       .PADDR_SIZE    (APB4_PADDR_SIZE),
+       .PDATA_SIZE    (APB4_PDATA_SIZE)
+       ) u_ahb_apb_brg (
+                        // AHB3 slave interface
+                        .HCLK      (CLK),
+                        .HRESETn   (RESETn),
+                        .HSEL      (ahb3_apb_brg_HSEL),
+                        .HADDR     (ahb3_apb_brg_HADDR),
+                        .HWDATA    (ahb3_apb_brg_HWDATA),
+                        .HRDATA    (ahb3_apb_brg_HRDATA),
+                        .HWRITE    (ahb3_apb_brg_HWRITE),
+                        .HSIZE     (ahb3_apb_brg_HSIZE),
+                        .HBURST    (ahb3_apb_brg_HBURST),
+                        .HPROT     (ahb3_apb_brg_HPROT),
+                        .HTRANS    (ahb3_apb_brg_HTRANS),
+                        .HREADYOUT (ahb3_apb_brg_HREADYOUT),
+                        .HREADY    (ahb3_apb_brg_HREADY),
+                        .HRESP     (ahb3_apb_brg_HRESP),
+                        .HMASTLOCK (1'b0),
+                        // APB4 master interface
+                        .PCLK      (CLK),
+                        .PRESETn   (RESETn),
+                        .PSEL      (apb4_PSEL),
+                        .PENABLE   (apb4_PENABLE),
+                        .PPROT     (apb4_PPROT),
+                        .PWRITE    (apb4_PWRITE),
+                        .PSTRB     (apb4_PSTRB),
+                        .PADDR     (apb4_PADDR),
+                        .PWDATA    (apb4_PWDATA),
+                        .PRDATA    (apb4_PRDATA),
+                        .PREADY    (apb4_PREADY),
+                        .PSLVERR   (apb4_PSLVERR)
+                        );
+
+   // Instantiate GPIO peripheral
+   apb_gpio
+     #(
+       .PDATA_SIZE   (8)
+       ) u_gpio (
+                 // APB4 interface
+                 .PCLK      (CLK),
+                 .PRESETn   (RESETn),
+                 .PSEL      (apb4_PSEL),
+                 .PENABLE   (apb4_PENABLE),
+                 .PWRITE    (apb4_PWRITE),
+                 .PSTRB     (apb4_PSTRB),
+                 .PADDR     (apb4_PADDR[3:0]),
+                 .PWDATA    (apb4_PWDATA),
+                 .PRDATA    (apb4_PRDATA),
+                 .PREADY    (apb4_PREADY),
+                 .PSLVERR   (apb4_PSLVERR),
+                 // GPIO/IRQ out
+                 .irq_o     (irq_o),
+                 .gpio_i    (gpio_i),
+                 .gpio_o    (gpio_o),
+                 .gpio_oe   (gpio_oe)
+                 );
+   
    // Enable master ports
    assign ahb3_cm3_code_HSEL = 1'b1;
    assign ahb3_cm3_sys_HSEL = 1'b1;

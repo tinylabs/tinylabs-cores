@@ -1,0 +1,23 @@
+CAPI=2:
+name: ::apb4_gpio:1.0
+description: APB4 GPIO interrupt capable peripheral
+
+filesets:
+    rtl:
+        depend:
+            - ahb3lite_pkg
+        files:
+            - rtl/verilog/apb_gpio.sv : {file_type : verilogSource}
+
+    license:
+        files:
+            - LICENSE.md : {file_type : user}
+
+targets:
+    default:
+        filesets : [rtl, license]
+
+provider:
+    name : github
+    user : RoaLogic
+    repo : apb4_gpio
