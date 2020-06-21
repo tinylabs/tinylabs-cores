@@ -35,6 +35,7 @@ filesets:
             - scripts/cortexm3sim.cfg : {file_type : user}
             - fw/blinky.bin : {file_type : user}
             - fw/blinky_sim.bin : {file_type : user}
+            - fw/blinky.hex : {file_type : user}
             
     arty_constraints:
         files:
@@ -83,6 +84,7 @@ targets:
         description: Synthesize obsfucated CM3 SoC for Digilent Arty-A35T (30MHz)
         default_tool: vivado
         filesets_append: [fpga_top, arty_constraints]
+        parameters: [XILINX_ENC_CM3=0,ROM_FILE=../src/cm3_min_soc_0.1/fw/blinky.hex]
         toplevel: [fpga_top]
         tools:
             vivado:
@@ -94,7 +96,7 @@ targets:
         description: Synthesize encrypted CM3 SoC for Digilent Arty-A35T (50MHz)
         default_tool: vivado
         filesets_append: [fpga_top, cm3_full_dep, arty_constraints]
-        parameters: [XILINX_ENC_CM3=1]
+        parameters: [XILINX_ENC_CM3=1,ROM_FILE=../src/cm3_min_soc_0.1/fw/blinky.hex]
         toplevel: [fpga_top]
         tools:
             vivado:
@@ -107,6 +109,11 @@ parameters:
         description: Synthesize encrypted cortex-m3 core in Vivado
         paramtype: vlogparam
 
+    ROM_FILE:
+        datatype: str
+        description: Boot file in readmemh format
+        paramtype: vlogparam
+        
     ROM_SZ:
         datatype: int
         default: 16384

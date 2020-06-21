@@ -28,4 +28,5 @@ provider:
     name : github
     user : RoaLogic
     repo : memory
+    patches : [files/0001-Add-LOAD_FILE-param.patch]
     

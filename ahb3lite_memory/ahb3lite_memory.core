@@ -24,4 +24,4 @@ provider:
     name : github
     user : RoaLogic
     repo : ahb3lite_memory
-    patches: [files/0001-Patch-to-remove-verilator-warnings.patch]
+    patches: [files/0001-Add-LOAD_FILE-param.patch]

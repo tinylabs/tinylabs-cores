@@ -9,12 +9,12 @@ module cm3_min_soc
   #(
     parameter XILINX_ENC_CM3 = 0,
     parameter ROM_SZ = (16384),
-    parameter RAM_SZ = (16384)
+    parameter RAM_SZ = (16384),
+    parameter ROM_FILE = ""
   ) (
      // Clock and reset
      input        CLK,
-     input        RESETn,
-     input        CPURESETn,
+     input        PORESETn,
      
      // JTAG/SWD
      input        TCK_SWDCLK,
@@ -24,12 +24,17 @@ module cm3_min_soc
      output       SWDOUT,
      output       SWDOUTEN,
 
-     // 1-bit gpio output
-     output logic LED
+     // 8-bit GPIO port
+     output logic [7:0] GPIO_O,
+     output logic [7:0] GPIO_OE,
+     input wire [7:0]   GPIO_I
    );
-   
+
    // Include generated AHB3lite interconnect crossbar
 `include "ahb3lite_intercon.vh"
+
+   // Implicit reset for autogen interconnect
+   assign RESETn = PORESETn;   
 
    // APB4 local bus
    // TODO: Create generator so more peripherals can be added via mux generation
@@ -40,20 +45,26 @@ module cm3_min_soc
    logic [(APB4_PDATA_SIZE/8)-1:0] apb4_PSTRB;
    logic [APB4_PADDR_SIZE-1:0]     apb4_PADDR;
    logic [APB4_PADDR_SIZE-1:0]     apb4_PWDATA;
-   logic [APB4_PADDR_SIZE-1:0]     apb4_PRDATA;
-   
-   // GPIO port
-   logic [APB4_PDATA_SIZE-1:0]     gpio_i, gpio_o, gpio_oe;
-   logic                           irq_o;
+   logic [APB4_PADDR_SIZE-1:0]     apb4_PRDATA;   
    
    // IRQs to cm3 core
    logic [15:0] irq;
    
-   // Disable IRQs on minimal implementation
-   assign irq = 16'h0;
+   // GPIO IRQ on 0 (IRQ16)
+   logic        gpio_irq;
+   assign irq = {15'h0, gpio_irq};
 
-   // Just use output for LED
-   assign LED = gpio_oe[0] ? gpio_o[0] : 1'b0;
+   // CPU reset controller
+   logic        cpureset_n, sysresetreq;
+   logic [3:0]  cpureset_ctr;
+   always @(posedge CLK)
+     begin
+        if (!PORESETn | sysresetreq)
+          cpureset_ctr <= 4'hf;
+        else if (|cpureset_ctr)
+          cpureset_ctr <= cpureset_ctr - 1;
+     end
+   assign cpureset_n = |cpureset_ctr ? 1'b0 : 1'b1;
    
    // Instantiate ROM
    ahb3lite_sram1rw
@@ -62,10 +73,11 @@ module cm3_min_soc
        .HADDR_SIZE (32),
        .HDATA_SIZE (32),
        .TECHNOLOGY ("GENERIC"),
-       .REGISTERED_OUTPUT ("NO")
+       .REGISTERED_OUTPUT ("NO"),
+       .LOAD_FILE (ROM_FILE)
        ) u_rom (
                 .HCLK      (CLK),
-                .HRESETn   (RESETn),
+                .HRESETn   (PORESETn),
                 .HSEL      (ahb3_rom_HSEL),
                 .HADDR     (ahb3_rom_HADDR),
                 .HWDATA    (ahb3_rom_HWDATA),
@@ -90,7 +102,7 @@ module cm3_min_soc
        .REGISTERED_OUTPUT ("NO")
        ) u_ram (
                 .HCLK      (CLK),
-                .HRESETn   (RESETn),
+                .HRESETn   (PORESETn),
                 .HSEL      (ahb3_ram_HSEL),
                 .HADDR     (ahb3_ram_HADDR),
                 .HWDATA    (ahb3_ram_HWDATA),
@@ -115,7 +127,7 @@ module cm3_min_soc
        ) u_ahb_apb_brg (
                         // AHB3 slave interface
                         .HCLK      (CLK),
-                        .HRESETn   (RESETn),
+                        .HRESETn   (PORESETn),
                         .HSEL      (ahb3_apb_brg_HSEL),
                         .HADDR     (ahb3_apb_brg_HADDR),
                         .HWDATA    (ahb3_apb_brg_HWDATA),
@@ -131,7 +143,7 @@ module cm3_min_soc
                         .HMASTLOCK (1'b0),
                         // APB4 master interface
                         .PCLK      (CLK),
-                        .PRESETn   (RESETn),
+                        .PRESETn   (PORESETn),
                         .PSEL      (apb4_PSEL),
                         .PENABLE   (apb4_PENABLE),
                         .PPROT     (apb4_PPROT),
@@ -147,11 +159,11 @@ module cm3_min_soc
    // Instantiate GPIO peripheral
    apb_gpio
      #(
-       .PDATA_SIZE   (8)
+       .PDATA_SIZE   (APB4_PDATA_SIZE)
        ) u_gpio (
                  // APB4 interface
                  .PCLK      (CLK),
-                 .PRESETn   (RESETn),
+                 .PRESETn   (PORESETn),
                  .PSEL      (apb4_PSEL),
                  .PENABLE   (apb4_PENABLE),
                  .PWRITE    (apb4_PWRITE),
@@ -162,10 +174,10 @@ module cm3_min_soc
                  .PREADY    (apb4_PREADY),
                  .PSLVERR   (apb4_PSLVERR),
                  // GPIO/IRQ out
-                 .irq_o     (irq_o),
-                 .gpio_i    (gpio_i),
-                 .gpio_o    (gpio_o),
-                 .gpio_oe   (gpio_oe)
+                 .irq_o     (gpio_irq),
+                 .gpio_i    (GPIO_I),
+                 .gpio_o    (GPIO_O),
+                 .gpio_oe   (GPIO_OE)
                  );
    
    // Enable master ports
@@ -182,9 +194,9 @@ module cm3_min_soc
             // Clock and reset
             .FCLK         (CLK),
             .HCLK         (CLK),
-            .PORESETn     (RESETn),
-            .CPURESETn    (CPURESETn),
-            .SYSRESETREQ  (),
+            .PORESETn     (PORESETn),
+            .CPURESETn    (cpureset_n),
+            .SYSRESETREQ  (sysresetreq),
             
             // IRQs
             .INTISR       (irq),

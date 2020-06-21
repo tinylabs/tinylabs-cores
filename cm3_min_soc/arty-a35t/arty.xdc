@@ -16,4 +16,5 @@ set_property -dict { PACKAGE_PIN U18    IOSTANDARD LVCMOS33 } [get_ports { TDO }
 set_property -dict { PACKAGE_PIN V17    IOSTANDARD LVCMOS33 } [get_ports { TMS_SWDIO }];  # IO10
 
 # LED output
-set_property -dict { PACKAGE_PIN H5    IOSTANDARD LVCMOS33 } [get_ports { LED }];
+set_property -dict { PACKAGE_PIN H5    IOSTANDARD LVCMOS33 } [get_ports { GPIO0 }];
+

@@ -80,15 +80,12 @@ int main(int argc, char **argv, char **env)
 	signal(SIGINT, INThandler);
 
     top->CLK = 0;
-    top->RESETn = 0;
-    top->CPURESETn = 0;
+    top->PORESETn = 0;
 	top->trace(tbUtils->tfp, 99);
 
 	while (tbUtils->doCycle() && !done) {
 		if (tbUtils->getTime() > RESET_TIME)
-			top->RESETn = 1;
-		if (tbUtils->getTime() > RESET_TIME + 2)
-			top->CPURESETn = 1;
+			top->PORESETn = 1;
 
 		top->eval();
         top->CLK = !top->CLK;
