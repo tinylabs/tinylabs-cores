@@ -7,9 +7,9 @@ This repo contains fusesoc compatible cores and a sample ARM Cortex-M3 system on
 * Verilator (if running sim)\
 apt-get install verilator
 * [Vivado](https://www.xilinx.com/support/download.html) (if synthesizing example SoC)
-* [ARM DesignStart Eval (CM3)](https://developer.arm.com/ip-products/designstart/eval)\
+* [ARM AT421 DesignStart Eval (CM3)](https://developer.arm.com/ip-products/designstart/eval)\
 _This is currently mirrored and linked from the fusesoc core so no need to download unless it's taken down_
-* [ARM DesignStart for FPGA (CM3)](https://developer.arm.com/ip-products/designstart/fpga) - Optional for encrypted CM3 synthesis
+* [ARM AT426 DesignStart for FPGA (CM3)](https://developer.arm.com/ip-products/designstart/fpga) - Optional for encrypted CM3 synthesis
 ## Preparation
 * Create an empty directory\
 `mkdir fusesoc-test; cd fusesoc-test`
@@ -38,17 +38,17 @@ On completion this will flash the Arty board if plugged in. You should see LD4 b
 `fusesoc library add cm3_full $PWD/AT426`
 * Synthesize using encrypted CM3\
 `fusesoc run --target=synth_arty_full cm3_min_soc`\
-Again, you should see LD4 blinking (66 % faster than obsfucated core)
+Again, you should see LD4 blinking (60 % faster than obsfucated core)
 #### AT421 Attributes
 * Plaintext interface
 * Compatible with Verilator
 * IRQ_CNT fixed at 16
 * Runs up to 30MHz (in my tests)
-* Uses 72% of LUTs
+* Uses 73% of LUTs
 * Synthesizable on non-Xilinx FPGAs
 #### AT426 Attributes
 * EDA optimizable
-* Runs up to 50MHz (in my tests)
+* Runs up to 48MHz (in my tests)
 * Uses 59% of LUTs
 * Up to 240 IRQs supported (not tested)
 * Synthesizable ONLY with Vivado
