@@ -43,7 +43,7 @@ module fpga_top
                       .DIVCLK_DIVIDE(1),    // Master division value , (1-56)
                       .REF_JITTER1(0.0),    // Reference input jitter in UI (0.000-0.999)
                       .STARTUP_WAIT("FALSE") // Delay DONE until PLL Locks, ("TRUE"/"FALSE")
-                      ) genclock (
+                      ) u_pll (
                                   // Clock outputs: 1-bit (each) output
                                   .CLKOUT0(hclk),
                                   .CLKFBOUT(pll_feedback), // 1-bit output, feedback clock
@@ -68,7 +68,7 @@ module fpga_top
                       .DIVCLK_DIVIDE(1),    // Master division value , (1-56)
                       .REF_JITTER1(0.0),    // Reference input jitter in UI (0.000-0.999)
                       .STARTUP_WAIT("FALSE") // Delay DONE until PLL Locks, ("TRUE"/"FALSE")
-                      ) genclock (
+                      ) u_pll (
                                   // Clock outputs: 1-bit (each) output
                                   .CLKOUT0(hclk),
                                   .CLKFBOUT(pll_feedback), // 1-bit output, feedback clock
@@ -101,7 +101,7 @@ module fpga_top
    // Inferred BUFIO  for gpio
    logic [7:0]         gpio_i, gpio_o, gpio_oe;
    assign GPIO0 = gpio_oe[0] ? gpio_o[0] : 1'bz;
-   assign gpio_i = {6'h0, GPIO0};
+   assign gpio_i = {7'h0, GPIO0};
 
    // Instantiate soc
    cm3_min_soc

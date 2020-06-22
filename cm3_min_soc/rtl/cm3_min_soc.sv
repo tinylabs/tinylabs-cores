@@ -30,11 +30,12 @@ module cm3_min_soc
      input wire [7:0]   GPIO_I
    );
 
+   // Implicit reset for autogen interconnect
+   logic                RESETn;
+   assign RESETn = PORESETn;   
+
    // Include generated AHB3lite interconnect crossbar
 `include "ahb3lite_intercon.vh"
-
-   // Implicit reset for autogen interconnect
-   assign RESETn = PORESETn;   
 
    // APB4 local bus
    // TODO: Create generator so more peripherals can be added via mux generation
@@ -179,6 +180,19 @@ module cm3_min_soc
                  .gpio_o    (GPIO_O),
                  .gpio_oe   (GPIO_OE)
                  );
+
+   // Default slave to handle bad requests
+   ahb3lite_zslave
+     u_zslave (
+               .CLK       (CLK),
+               .RESETn    (PORESETn),
+               .HSEL      (ahb3_zslave_HSEL),
+               .HTRANS    (ahb3_zslave_HTRANS),
+               .HREADY    (ahb3_zslave_HREADY),
+               .HREADYOUT (ahb3_zslave_HREADYOUT),
+               .HRESP     (ahb3_zslave_HRESP),
+               .HRDATA    (ahb3_zslave_HRDATA)
+               );
    
    // Enable master ports
    assign ahb3_cm3_code_HSEL = 1'b1;

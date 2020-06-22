@@ -1,0 +1,16 @@
+CAPI=2:
+name: ::ahb3lite_zslave:0.1
+description: Default slave to return invalid response
+
+filesets:
+    rtl:
+        depend:
+            - ahb3lite_pkg
+        files:
+            - rtl/ahb3lite_zslave.sv
+        file_type : verilogSource
+
+targets:
+    default:
+        filesets : [rtl]
+    
