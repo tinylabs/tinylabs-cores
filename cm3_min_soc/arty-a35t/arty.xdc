@@ -5,6 +5,7 @@ set_property -dict { PACKAGE_PIN E3    IOSTANDARD LVCMOS33 } [get_ports { CLK_10
 create_clock -add -name sys_clk_pin -period 10.00 -waveform {0 5} [get_ports { CLK_100M }];
 # 10MHz max jtag clock
 create_clock -add -name jtag_clk -period 100.00 -waveform {0 50} [get_ports { TCK_SWDCLK }];
+set_false_path -from [get_clocks jtag_clk] -to [get_clocks hclk]
 
 # RESETn
 set_property -dict { PACKAGE_PIN D9    IOSTANDARD LVCMOS33 } [get_ports { RESET }];

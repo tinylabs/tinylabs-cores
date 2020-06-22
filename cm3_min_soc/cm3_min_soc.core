@@ -92,7 +92,7 @@ targets:
         tools:
             vivado:
                 part: xc7a35ticsg324-1L
-                vivado-settings: /opt/xilinx/Vivado/2020.1/settings64.sh
+                #vivado-settings: /opt/xilinx/Vivado/2020.1/settings64.sh
 
     synth_arty_full:
         <<: *base
@@ -104,7 +104,7 @@ targets:
         tools:
             vivado:
                 part: xc7a35ticsg324-1L
-                vivado-settings: /opt/xilinx/Vivado/2020.1/settings64.sh
+                #vivado-settings: /opt/xilinx/Vivado/2020.1/settings64.sh
         
 parameters:
     XILINX_ENC_CM3:
