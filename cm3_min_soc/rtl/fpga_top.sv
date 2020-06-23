@@ -31,11 +31,11 @@ module fpga_top
    generate
       if (XILINX_ENC_CM3) begin : gen_pll
          
-         // Full CM3 core can support HCLK=48MHz
+         // Full CM3 core can support HCLK=40MHz
          PLLE2_BASE #(
                       .BANDWIDTH ("OPTIMIZED"),
                       .CLKFBOUT_MULT (12),
-                      .CLKOUT0_DIVIDE(25),    // 48MHz
+                      .CLKOUT0_DIVIDE(30),    // 40MHz
                       .CLKFBOUT_PHASE(0.0),   // Phase offset in degrees of CLKFB, (-360-360)
                       .CLKIN1_PERIOD(10.0),   // 100MHz input clock
                       .CLKOUT0_DUTY_CYCLE(0.5),
