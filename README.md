@@ -38,7 +38,7 @@ On completion this will flash the Arty board if plugged in. You should see LD4 b
 `fusesoc library add cm3_full $PWD/AT426`
 * Synthesize using encrypted CM3\
 `fusesoc run --target=synth_arty_full cm3_min_soc`\
-Again, you should see LD4 blinking (60 % faster than obsfucated core)
+Again, you should see LD4 blinking
 #### AT421 Attributes
 * Plaintext interface
 * Compatible with Verilator
@@ -48,10 +48,16 @@ Again, you should see LD4 blinking (60 % faster than obsfucated core)
 * Synthesizable on non-Xilinx FPGAs
 #### AT426 Attributes
 * EDA optimizable
-* Runs up to 48MHz (in my tests)
+* Runs up to 40MHz (in my tests)
 * Uses 59% of LUTs
 * Up to 240 IRQs supported (not tested)
 * Synthesizable ONLY with Vivado
+### Help! Things that need fixing:
+* Implied RAM generates a bunch of warnings in Vivado, would be nice to know if these are valid and if so how to fix them.
+* The top level timings constraints could be improved. They may be altogether wrong, any help here would be much appreciated.
+* A fusesoc generator for the APB bus would be useful to add additional APB peripherals.
+* Additional core targets for popular boards that are supported by the fusesoc (edalize) backend would be great.
+* More testing all around.
 ## Licensing
 My understanding [not a lawyer(TM)] is that the AT426 core is OK for commercial use if used on Xilinx 7-series parts. However, many of the other components from RoaLogic (ahb3lite_interconnect, ahb3lite_memory, ahb3lite_apb_brige, apb4_gpio) have a non-commercial clause. With some work these components could be replaced.\
 \
