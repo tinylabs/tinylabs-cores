@@ -24,4 +24,5 @@ provider:
     name : github
     user : RoaLogic
     repo : ahb3lite_memory
-    patches: [files/0001-Add-LOAD_FILE-param.patch]
+    patches: [files/0001-Add-LOAD_FILE-param.patch,
+              files/0002-Remove-async-reset.patch]

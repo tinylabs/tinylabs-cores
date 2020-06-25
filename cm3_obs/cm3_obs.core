@@ -18,5 +18,6 @@ provider:
     name : github
     user : Grekery
     repo : AT421-MN-80001-r0p0-02rel0
-    patches : [files/0001-Remove-verilator-warnings.patch]
+    patches : [files/0001-Remove-verilator-warnings.patch,
+               files/0002-Remove-async-reset.patch]
     

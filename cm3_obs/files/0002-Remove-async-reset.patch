@@ -1,0 +1,25 @@
+From c92bef2ae756694df15da7ff45cb0dbfb443afc5 Mon Sep 17 00:00:00 2001
+From: Elliot Buller <elliot@tinylabs.io>
+Date: Thu, 25 Jun 2020 10:22:20 -0600
+Subject: [PATCH] Remove async reset
+
+---
+ .../logical/cortexm3integration_ds/verilog/cm3_code_mux.v       | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/m3designstart/logical/cortexm3integration_ds/verilog/cm3_code_mux.v b/m3designstart/logical/cortexm3integration_ds/verilog/cm3_code_mux.v
+index 38ef9ca..e9e96c6 100644
+--- a/m3designstart/logical/cortexm3integration_ds/verilog/cm3_code_mux.v
++++ b/m3designstart/logical/cortexm3integration_ds/verilog/cm3_code_mux.v
+@@ -114,7 +114,7 @@ module cm3_code_mux (
+   assign EXRESPD = d_trans_active_reg & EXRESPC;
+ 
+   // Registered d_trans_active
+-  always @ (posedge HCLK or negedge HRESETn)
++  always @ (posedge HCLK)
+     begin
+       if (!HRESETn)
+         d_trans_active_reg <= 1'b0;
+-- 
+2.20.1
+

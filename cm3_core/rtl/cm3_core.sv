@@ -235,11 +235,13 @@ module cm3_core #(
                       .STCALIB       (26'h0),    // Systick calib
                       .FIXMASTERTYPE (1'b1),     // Needs to be 1
                       .TSVALUEB      (48'h0),    // TPIU timestamp
+                      .TSCLKCHANGE   (1'b0),     // Not used
                       .MPUDISABLE    (1'b0),
                       .DBGEN         (1'b1),
                       .TXEV          (),         // TX event output
                       .RXEV          (1'b0),     // RX event input
-                      
+                      .INTERNALSTATE (),
+
                       // Traceport - unused
                       .TRACEDATA     (),
                       .TRCENA        (),

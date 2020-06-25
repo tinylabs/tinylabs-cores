@@ -21,5 +21,7 @@ provider:
     name : github
     user : RoaLogic
     repo : ahb3lite_apb_bridge
-    patches : [files/0001-Fix-verilator-warnings.patch, files/0002-Fix-PADDR-on-word-read.patch]
+    patches : [files/0001-Fix-verilator-warnings.patch,
+               files/0002-Fix-PADDR-on-word-read.patch,
+               files/0003-Fix-assertions.patch]
     

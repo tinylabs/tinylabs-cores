@@ -29,6 +29,6 @@ generators:
         
 provider:
     name : github
-    user : tinylabs
+    user : RoaLogic
     repo : ahb3lite_interconnect
-    patches : [0001-Add-fusesoc-gen.patch]
+    patches : [files/0001-TL-patches-gen-overlap-verilator.patch]

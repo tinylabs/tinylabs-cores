@@ -46,6 +46,11 @@ module fpga_top
                       ) u_pll (
                                   // Clock outputs: 1-bit (each) output
                                   .CLKOUT0(hclk),
+                                  .CLKOUT1(),
+                                  .CLKOUT2(),
+                                  .CLKOUT3(),
+                                  .CLKOUT4(),
+                                  .CLKOUT5(),
                                   .CLKFBOUT(pll_feedback), // 1-bit output, feedback clock
                                   .LOCKED(pll_locked),
                                   .CLKIN1(CLK_100M),
@@ -71,6 +76,11 @@ module fpga_top
                       ) u_pll (
                                   // Clock outputs: 1-bit (each) output
                                   .CLKOUT0(hclk),
+                                  .CLKOUT1(),
+                                  .CLKOUT2(),
+                                  .CLKOUT3(),
+                                  .CLKOUT4(),
+                                  .CLKOUT5(),
                                   .CLKFBOUT(pll_feedback), // 1-bit output, feedback clock
                                   .LOCKED(pll_locked),
                                   .CLKIN1(CLK_100M),

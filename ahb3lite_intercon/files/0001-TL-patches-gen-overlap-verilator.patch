@@ -1,60 +1,152 @@
-From 83754c0a58521e6aeb9af2e4c621275a8aa60d96 Mon Sep 17 00:00:00 2001
+From 1aee2ab2bfca5c0c130fb1d2522b237f66304c27 Mon Sep 17 00:00:00 2001
 From: Elliot Buller <elliot@tinylabs.io>
-Date: Tue, 16 Jun 2020 13:05:43 -0600
-Subject: Add fusesoc gen, fix verilator warnings
+Date: Thu, 25 Jun 2020 12:10:43 -0600
+Subject: [PATCH] TL patches - gen, overlap, verilator
 
 ---
- rtl/verilog/ahb3lite_interconnect.sv          |  13 +-
- .../ahb3lite_interconnect_master_port.sv      |  16 +-
- .../ahb3lite_interconnect_slave_port.sv       |   3 +-
- sw/ahb3lite_intercon.py                       | 311 ++++++++++++++++++
- sw/verilogwriter.py                           | 130 ++++++++
- 5 files changed, 466 insertions(+), 7 deletions(-)
+ rtl/verilog/ahb3lite_interconnect.sv          |  22 +-
+ .../ahb3lite_interconnect_master_port.sv      |  44 ++-
+ .../ahb3lite_interconnect_slave_port.sv       |  30 +-
+ .../ahb3lite_interconnect_slave_priority.sv   |   6 +-
+ sw/ahb3lite_intercon.py                       | 319 ++++++++++++++++++
+ sw/verilogwriter.py                           | 130 +++++++
+ 6 files changed, 507 insertions(+), 44 deletions(-)
  create mode 100644 sw/ahb3lite_intercon.py
  create mode 100644 sw/verilogwriter.py
 
 diff --git a/rtl/verilog/ahb3lite_interconnect.sv b/rtl/verilog/ahb3lite_interconnect.sv
-index db10d48..b90a5a6 100644
+index 3072eef..4c4cc39 100644
 --- a/rtl/verilog/ahb3lite_interconnect.sv
 +++ b/rtl/verilog/ahb3lite_interconnect.sv
-@@ -123,8 +123,11 @@ module ahb3lite_interconnect #(
-   parameter                  MASTERS                      = 3, //number of AHB Masters
+@@ -51,17 +51,17 @@
+ //  SLAVE_MASK                 Per Master Slave mask
+ //  ERROR_ON_SLAVE_MASK        Per Master error response on masked slave
+ // ------------------------------------------------------------------
+-// REUSE ISSUES 
++// REUSE ISSUES
+ //   Reset Strategy      : external asynchronous active low; HRESETn
+ //   Clock Domains       : HCLK, rising edge
+-//   Critical Timing     : 
++//   Critical Timing     :
+ //   Test Features       : na
+ //   Asynchronous I/F    : no
+ //   Scan Methodology    : na
+ //   Instantiations      : ahb3lite_interconnect_master_port
+ //                         ahb3lite_interconnect_slave_port
+ //   Synthesizable (y/n) : Yes
+-//   Other               :                                         
++//   Other               :
+ // -FHDR-------------------------------------------------------------
+ 
+ /*
+@@ -70,7 +70,7 @@
+  *   sets the number of AHB slave-ports on the switch
+  *   AHB bus masters connect to these ports. There should only be 1 bus master per slave port
+  *
+- *   HSEL is used to determine if the port is accessed. This allows a single AHB bus master to be connected to multiple switches. 
++ *   HSEL is used to determine if the port is accessed. This allows a single AHB bus master to be connected to multiple switches.
+  *   It is allowed to drive HSEL with a static/hardwired signal ('1'). This results in a smaller (less logic resources) and faster (larger slack) switch.
+  *
+  *   'priority' sets the priority of the port. This is used to determine what slave-port (AHB bus master) gets granted access to a master-port when multiple slave-ports want to access the same master-port. The slave-port with the highest priority is granted access.
+@@ -94,7 +94,7 @@
+  *   Setting a MASK bit to '0' indicates that master will never access the slave.
+  *   Setting a MASK bit to '1' indicates that master will/can access the slave.
+  *
+- *   example: MASTERS=3, SLAVES=2. 
++ *   example: MASTERS=3, SLAVES=2.
+  *          | 2 1 0
+  *          |------
+  *         1| 1 1 0    Slave[1] can only be accessed by masters 2 and 1. Master[0] never accesses Slave[1]
+@@ -124,7 +124,7 @@ module ahb3lite_interconnect #(
    parameter                  SLAVES                       = 8, //number of AHB slaves
  
--  parameter bit [SLAVES-1:0] SLAVE_MASK         [MASTERS] = '{MASTERS{ {SLAVES{1'b1}} }},
+   parameter bit [SLAVES-1:0] SLAVE_MASK         [MASTERS] = '{MASTERS{ {SLAVES{1'b1}} }},
 -  parameter bit [SLAVES-1:0] ERROR_ON_SLAVE_MASK[MASTERS] = invert_slave_mask(),
-+  parameter bit [SLAVES-1:0] SLAVE_MASK         [MASTERS]  = '{MASTERS{ {SLAVES{1'b1}} }},
-+  parameter bit [SLAVES-1:0] ERROR_ON_SLAVE_MASK[MASTERS]  = '{MASTERS{ {SLAVES{1'b0}} }},
-+  // Verilat-or couldn't compile this - HACK above as it's not dynamic
-+  // for our use case interconnect is fully connected (MASTER->SLAVE) so this is OK.
-+  //parameter bit [SLAVES-1:0] ERROR_ON_SLAVE_MASK[MASTERS] = invert_slave_mask(),
++  parameter bit [SLAVES-1:0] ERROR_ON_SLAVE_MASK[MASTERS] = '{MASTERS{ {SLAVES{1'b0}} }}, //invert_slave_mask(),
  
    //actually localparam
-   parameter                  MASTER_BITS          = $clog2(MASTERS)
-@@ -249,7 +252,8 @@ generate
-     .MASTERS             ( MASTERS                ),
-     .SLAVES              ( SLAVES                 ),
-     .SLAVE_MASK          ( SLAVE_MASK         [m] ),
--    .ERROR_ON_SLAVE_MASK ( ERROR_ON_SLAVE_MASK[m] ) )
-+    .ERROR_ON_SLAVE_MASK ( ERROR_ON_SLAVE_MASK[m] ),
-+    .MASTER_BITS         ( MASTER_BITS ) )
+   parameter                  MASTER_BITS          = $clog2(MASTERS+1)
+@@ -236,7 +236,7 @@ module ahb3lite_interconnect #(
+   //
+   // Module Body
+   //
+-  
++
+   /*
+    * Hookup Master Interfaces
+    */
+@@ -253,7 +253,7 @@ generate
    master_port (
      .HRESETn             ( HRESETn                ),
      .HCLK                ( HCLK                   ),
-@@ -349,7 +353,8 @@ generate
-   ahb3lite_interconnect_slave_port #(
-     .HADDR_SIZE      ( HADDR_SIZE           ),
-     .HDATA_SIZE      ( HDATA_SIZE           ),
--    .MASTERS         ( MASTERS              ) )
-+    .MASTERS         ( MASTERS              ),
-+    .MASTER_BITS     ( MASTER_BITS ) )
+-	 
++
+     //AHB Slave Interfaces (receive data from AHB Masters)
+     //AHB Masters conect to these ports
+     .mst_priority        ( mst_priority       [m] ),
+@@ -270,7 +270,7 @@ generate
+     .mst_HREADYOUT       ( mst_HREADYOUT      [m] ),
+     .mst_HREADY          ( mst_HREADY         [m] ),
+     .mst_HRESP           ( mst_HRESP          [m] ),
+-    
++
+     //AHB Master Interfaces (send data to AHB slaves)
+     //AHB Slaves connect to these ports
+     .slvHADDRmask        ( slv_addr_mask          ),
+@@ -331,7 +331,7 @@ endgenerate
+     begin: master
+       for (s=0; s<SLAVES; s++)
+       begin: slave
+-          assign tomstgrant [m][s] = fromslvgrant    [s][m];   
++          assign tomstgrant [m][s] = fromslvgrant    [s][m];
+           assign tomstHRDATA[m][s] = fromslvHRDATA   [s];
+           assign tomstHREADY[m][s] = fromslvHREADYOUT[s];
+           assign tomstHRESP [m][s] = fromslvHRESP    [s];
+@@ -353,7 +353,7 @@ generate
    slave_port (
      .HRESETn         ( HRESETn              ),
      .HCLK            ( HCLK                 ),
+-	 
++
+     //AHB Slave Interfaces (receive data from AHB Masters)
+     //AHB Masters connect to these ports
+     .mstpriority     ( toslvpriority    [s] ),
 diff --git a/rtl/verilog/ahb3lite_interconnect_master_port.sv b/rtl/verilog/ahb3lite_interconnect_master_port.sv
-index d93ca00..e7c0b71 100644
+index de9d6ab..11de1b0 100644
 --- a/rtl/verilog/ahb3lite_interconnect_master_port.sv
 +++ b/rtl/verilog/ahb3lite_interconnect_master_port.sv
+@@ -51,18 +51,18 @@
+ //                                          1:slave can be addressed
+ //  ERROR_ON_SLAVE_MASK 1+       ERROR when addressing masked slave
+ // ------------------------------------------------------------------
+-// REUSE ISSUES 
++// REUSE ISSUES
+ //   Reset Strategy      : external asynchronous active low; HRESETn
+ //   Clock Domains       : HCLK, rising edge
+-//   Critical Timing     : 
++//   Critical Timing     :
+ //   Test Features       : na
+ //   Asynchronous I/F    : no
+ //   Scan Methodology    : na
+ //   Instantiations      : none
+ //   Synthesizable (y/n) : Yes
+-//   Other               :                                         
++//   Other               :
+ // -FHDR-------------------------------------------------------------
+- 
++
+ module ahb3lite_interconnect_master_port #(
+   parameter              HADDR_SIZE          = 32,
+   parameter              HDATA_SIZE          = 32,
+@@ -82,7 +82,7 @@ module ahb3lite_interconnect_master_port #(
+   //AHB Slave Interfaces (receive data from AHB Masters)
+   //AHB Masters connect to these ports
+   input  [MASTER_BITS-1:0]              mst_priority,
+- 
++
+   input                                 mst_HSEL,
+   input  [HADDR_SIZE -1:0]              mst_HADDR,
+   input  [HDATA_SIZE -1:0]              mst_HWDATA,
 @@ -141,6 +141,8 @@ module ahb3lite_interconnect_master_port #(
  
    logic [SLAVES     -1:0] current_HSEL,      //current-cycle addressed slave
@@ -64,6 +156,61 @@ index d93ca00..e7c0b71 100644
                            error_masked_HSEL; //generate error when accessing masked slave
  
    logic                   local_HREADYOUT,
+@@ -190,7 +192,7 @@ module ahb3lite_interconnect_master_port #(
+   /*
+    * Register Address Phase Signals
+    */
+-  always @(posedge HCLK,negedge HRESETn)
++  always @(posedge HCLK)
+     if      (!HRESETn    ) regHTRANS <= HTRANS_IDLE;
+     else if ( mst_HREADY ) regHTRANS <= mst_HSEL ? mst_HTRANS : HTRANS_IDLE;
+ 
+@@ -205,7 +207,7 @@ module ahb3lite_interconnect_master_port #(
+         regHBURST    <= mst_HBURST;
+         regHPROT     <= mst_HPROT;
+         regHMASTLOCK <= mst_HMASTLOCK;
+-    end 
++    end
+ 
+   /*
+    * Generate local HREADY and HRESP
+@@ -214,13 +216,13 @@ module ahb3lite_interconnect_master_port #(
+    * Always generate HREADY when IDLE, otherwise insert wait state
+    * HRESP is always OKAY, except when addressing masked slave
+    */
+-  always @(posedge HCLK,negedge HRESETn)
++  always @(posedge HCLK)
+     if      (!HRESETn    ) local_HREADYOUT <= 1'b1;
+     else if ( local_HRESP) local_HREADYOUT <= 1'b1; //HRESP='1' 2nd cycle of ERROR-response
+     else if ( mst_HREADY ) local_HREADYOUT <= (mst_HTRANS == HTRANS_IDLE) | ~mst_HSEL;
+ 
+ 
+-  always @(posedge HCLK,negedge HRESETn)
++  always @(posedge HCLK)
+     if      (!HRESETn   ) local_HRESP <= HRESP_OKAY;
+     else if ( mst_HREADY) local_HRESP <= |error_masked_HSEL ? HRESP_ERROR : HRESP_OKAY;
+ 
+@@ -240,9 +242,9 @@ module ahb3lite_interconnect_master_port #(
+    *                 else go to NO_ACCESS
+    */
+ 
+-  always @(posedge HCLK,negedge HRESETn)
++  always @(posedge HCLK)
+     if (!HRESETn) access_state <= NO_ACCESS;
+-    else 
++    else
+       case (access_state)
+         NO_ACCESS     : if      (~|current_HSEL && ~|pending_HSEL  ) access_state <= NO_ACCESS;
+                         else if ( |(current_HSEL & master_granted) ) access_state <= ACCESS_GRANTED;
+@@ -290,7 +292,7 @@ module ahb3lite_interconnect_master_port #(
+   assign can_switch = ( no_access      & ~|(current_HSEL & master_granted) ) |
+                       ( access_pending & ~|(pending_HSEL & master_granted) ) |
+                       ( access_granted & ( ~mst_HSEL |
+-                                           (mst_HSEL & ~mst_HMASTLOCK & mst_HREADY & 
++                                           (mst_HSEL & ~mst_HMASTLOCK & mst_HREADY &
+                                              ( (mst_HTRANS == HTRANS_IDLE                                              ) |
+                                                (mst_HTRANS == HTRANS_NONSEQ & mst_HBURST == HBURST_SINGLE              ) |
+                                                (mst_HTRANS == HTRANS_SEQ    & mst_HBURST != HBURST_INCR   & ~|burst_cnt) )
 @@ -308,9 +310,9 @@ module ahb3lite_interconnect_master_port #(
  generate
    for (s=0; s<SLAVES; s++)
@@ -91,34 +238,177 @@ index d93ca00..e7c0b71 100644
    /*
     * Check if granted access
     */
-   always @(posedge HCLK,negedge HRESETn)
+-  always @(posedge HCLK,negedge HRESETn)
++  always @(posedge HCLK)
      if      (!HRESETn     ) slave_sel <= 'h0;
-+   /* verilator lint_off WIDTH */
++    /* verilator lint_off WIDTH */
      else if ( mst_HREADY  ) slave_sel <= onehot2int( slvHSEL );
-+   /* verilator lint_on WIDTH */
++    /* verilator lint_on WIDTH */
  
    /*
     * Outgoing data (to slaves)
+@@ -349,7 +361,7 @@ endgenerate
+    */
+   assign mst_HRDATA    =                  slvHRDATA[slave_sel];
+   assign mst_HREADYOUT = access_granted ? slvHREADY[slave_sel] : local_HREADYOUT; //master's HREADYOUT is driven by slave's HREADY (slv_HREADY -> mst_HREADYOUT)
+-  assign mst_HRESP     = access_granted ? slvHRESP [slave_sel] : local_HRESP; 
++  assign mst_HRESP     = access_granted ? slvHRESP [slave_sel] : local_HRESP;
+ endmodule
+ 
+ 
 diff --git a/rtl/verilog/ahb3lite_interconnect_slave_port.sv b/rtl/verilog/ahb3lite_interconnect_slave_port.sv
-index 195b20b..b2fcdb9 100644
+index 3400e6f..8b38dc8 100644
 --- a/rtl/verilog/ahb3lite_interconnect_slave_port.sv
 +++ b/rtl/verilog/ahb3lite_interconnect_slave_port.sv
-@@ -269,7 +269,8 @@ module ahb3lite_interconnect_slave_port #(
+@@ -1,3 +1,4 @@
++/* verilator lint_off WIDTH */
+ /////////////////////////////////////////////////////////////////////
+ //   ,------.                    ,--.                ,--.          //
+ //   |  .--. ' ,---.  ,--,--.    |  |    ,---. ,---. `--' ,---.    //
+@@ -48,16 +49,16 @@
+ //  HDATA_SIZE        1+       Data bus size            32      bits
+ //  MASTERS           1+       Number of Master ports   3       ports
+ // ------------------------------------------------------------------
+-// REUSE ISSUES 
++// REUSE ISSUES
+ //   Reset Strategy      : external asynchronous active low; HRESETn
+ //   Clock Domains       : HCLK, rising edge
+-//   Critical Timing     : 
++//   Critical Timing     :
+ //   Test Features       : na
+ //   Asynchronous I/F    : no
+ //   Scan Methodology    : na
+ //   Instantiations      : none
+ //   Synthesizable (y/n) : Yes
+-//   Other               :                                         
++//   Other               :
+ // -FHDR-------------------------------------------------------------
  
-   //recursive functions are not supported in Intel Quartus. Use Verilog Module instead
-   ahb3lite_interconnect_slave_priority #(
--    .MASTERS    ( MASTERS                )
-+    .MASTERS       ( MASTERS                ),
-+    .PRIORITY_BITS ( MASTER_BITS            )
-   )
-   requested_priority_inst (
-     .HSEL       ( mstHSEL                ),
+ 
+@@ -127,15 +128,15 @@ module ahb3lite_interconnect_slave_port #(
+                                            last_granted_master_idx; //last granted master for requested priority level
+   logic [MASTERS    -1:0][MASTER_BITS-1:0] last_granted_masters;    //per priority level, for round-robin
+ 
+-  
++
+   logic [MASTER_BITS-1:0]                  granted_master_idx,      //granted master as index
+                                            granted_master_idx_dly;  //deleayed granted master index (for HWDATA)
+-  
++
+   logic                                    can_switch_master;       //Slave may switch to a new master
+ 
+-  
++
+   genvar m;
+-  
++
+ 
+   //////////////////////////////////////////////////////////////////
+   //
+@@ -161,6 +162,7 @@ module ahb3lite_interconnect_slave_port #(
+    * Intel Quartus does not support recursive functions.
+    * Even though this one would be perfectly fine
+   */
++`ifdef RECURSIVE_FUNCTIONS_SUPPORTED
+   function automatic [MASTER_BITS-1:0] highest_requested_priority (
+     input [MASTERS-1:0]                  hsel,
+     input [MASTERS-1:0][MASTER_BITS-1:0] priorities,
+@@ -185,7 +187,7 @@ module ahb3lite_interconnect_slave_port #(
+     //finally compare lo and hi priorities
+     return (priority_hi > priority_lo) ? priority_hi : priority_lo;
+   endfunction : highest_requested_priority
+-
++`endif
+ 
+   //If every master has its own unique priority, this just becomes HSEL
+   function [MASTERS-1:0] requesters;
+@@ -210,7 +212,7 @@ module ahb3lite_interconnect_slave_port #(
+ 
+     //default value, don't switch if not needed
+     nxt_master = current_master;
+-	 
++
+     //implement round-robin
+     offset = last_master +1;
+     sr = {pending_masters,pending_masters};
+@@ -238,7 +240,7 @@ module ahb3lite_interconnect_slave_port #(
+ 
+     //default value, don't switch if not needed
+     nxt_master = current_master;
+-	 
++
+     //implement round-robin
+     mst_lst     = {pending_masters,pending_masters} >> last_master;
+     mst_idx_lst = mst_idx_lst >> (last_master * MASTER_BITS);
+@@ -294,14 +296,14 @@ module ahb3lite_interconnect_slave_port #(
+ 
+ 
+   //select new master
+-  always @(posedge HCLK, negedge HRESETn)
++  always @(posedge HCLK)
+     if      (!HRESETn       ) granted_master <= 'h1;
+     else if ( slv_HREADY    )
+       if (can_switch_master) granted_master <= (1 << pending_master_idx);
+ 
+ 
+   //store current master (for this priority level)
+-  always @(posedge HCLK, negedge HRESETn)
++  always @(posedge HCLK)
+     if      (!HRESETn       ) last_granted_masters <= 'h1;
+     else if ( slv_HREADY)
+       if (can_switch_master) last_granted_masters[requested_priority_lvl] <= pending_master_idx;
+@@ -310,7 +312,7 @@ module ahb3lite_interconnect_slave_port #(
+   /*
+    * Get signals from current requester
+    */
+-  always @(posedge HCLK, negedge HRESETn)
++  always @(posedge HCLK)
+     if      (!HRESETn   ) granted_master_idx <= 'h0;
+     else if ( slv_HREADY)
+       if (can_switch_master) granted_master_idx <= pending_master_idx;
+@@ -344,4 +346,4 @@ module ahb3lite_interconnect_slave_port #(
+   assign mstHRESP     =  slv_HRESP;
+ endmodule
+ 
+-
++/* verilator lint_on WIDTH */
+diff --git a/rtl/verilog/ahb3lite_interconnect_slave_priority.sv b/rtl/verilog/ahb3lite_interconnect_slave_priority.sv
+index 8b94881..916781f 100644
+--- a/rtl/verilog/ahb3lite_interconnect_slave_priority.sv
++++ b/rtl/verilog/ahb3lite_interconnect_slave_priority.sv
+@@ -53,7 +53,7 @@
+ //  HI
+ //  LO
+ // ------------------------------------------------------------------
+-// REUSE ISSUES 
++// REUSE ISSUES
+ //   Reset Strategy      : none
+ //   Clock Domains       : none
+ //   Critical Timing     :
+@@ -62,7 +62,7 @@
+ //   Scan Methodology    : na
+ //   Instantiations      : Itself (recursive)
+ //   Synthesizable (y/n) : Yes
+-//   Other               :                                         
++//   Other               :
+ // -FHDR-------------------------------------------------------------
+ 
+ module ahb3lite_interconnect_slave_priority #(
+@@ -71,7 +71,7 @@ module ahb3lite_interconnect_slave_priority #(
+   parameter LO         = 0,
+ 
+   //really a localparam
+-  parameter PRIORITY_BITS = $clog2(MASTERS)
++  parameter PRIORITY_BITS = $clog2(MASTERS+1)
+ )
+ (
+   input  [MASTERS      -1:0]                    HSEL,
 diff --git a/sw/ahb3lite_intercon.py b/sw/ahb3lite_intercon.py
 new file mode 100644
-index 0000000..0f58600
+index 0000000..dc1c4fd
 --- /dev/null
 +++ b/sw/ahb3lite_intercon.py
-@@ -0,0 +1,311 @@
+@@ -0,0 +1,319 @@
 +#!/usr/bin/env python
 +import sys
 +from collections import OrderedDict, defaultdict
@@ -204,6 +494,8 @@ index 0000000..0f58600
 +            elif key == 'size':
 +                self.size = parse_number(value)
 +                self.mask = ~(self.size-1) & 0xffffffff
++            elif key == 'idx':
++                pass
 +            else:
 +                raise UnknownPropertyError(
 +                    "Unknown property '%s' in slave section '%s'" % (
@@ -219,6 +511,10 @@ index 0000000..0f58600
 +        self.name = name
 +        self.value = value
 +
++def xsort(a):
++  print (a[0])
++  print (a[1])
++  print (type (a))
 +
 +class AHB3Intercon:
 +    def __init__(self, name, config_file):
@@ -252,7 +548,11 @@ index 0000000..0f58600
 +            self.masters[k] = Master(k,index,v)
 +            index = index + 1
 +        index = 0
++        # Sort by idx param
 +        for k,v in config['slaves'].items():
++          v.setdefault ('idx', 1)
++        sslaves = sorted (config['slaves'].items(), key=lambda x: x[1]['idx'])
++        for k,v in sslaves:
 +            print("Found slave " + k)
 +            self.slaves[k] = Slave(k,index,v)
 +            index = index + 1
@@ -294,8 +594,7 @@ index 0000000..0f58600
 +        # Declare global wires to pass to instantiation
 +        self.verilog_writer.add (LocalParam ('MASTERS', len (self.masters)))
 +        self.verilog_writer.add (LocalParam ('SLAVES', len (self.slaves)))
-+        mclog2 = max([math.ceil(math.log2(len (self.masters))), 1])
-+        self.verilog_writer.add (LocalParam ('MASTER_BITS', mclog2))
++        mclog2 = max([math.ceil(math.log2(len (self.masters))), 2])
 +        self.verilog_writer.add (Wire ('mst_priority', mclog2, append=' [MASTERS]'))
 +        self.verilog_writer.add (Wire ('slv_addr_base', 32, append=' [SLAVES]'))
 +        self.verilog_writer.add (Wire ('slv_addr_mask', 32, append=' [SLAVES]'))
@@ -372,7 +671,6 @@ index 0000000..0f58600
 +                       Parameter ('SLAVES', len (self.slaves)),
 +                       Parameter ('HADDR_SIZE', 32),
 +                       Parameter ('HDATA_SIZE', 32),
-+                       Parameter ('MASTER_BITS', 'MASTER_BITS'),
 +                       ]
 +        inter_ports = [Port ('HCLK', 'clk'),
 +                       Port ('HRESETn', 'reset_n'),
