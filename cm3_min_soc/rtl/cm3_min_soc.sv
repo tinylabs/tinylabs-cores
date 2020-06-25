@@ -182,16 +182,16 @@ module cm3_min_soc
                  );
 
    // Default slave to handle bad requests
-   ahb3lite_zslave
-     u_zslave (
+   ahb3lite_default_slave
+     u_dslave (
                .CLK       (CLK),
                .RESETn    (PORESETn),
-               .HSEL      (ahb3_zslave_HSEL),
-               .HTRANS    (ahb3_zslave_HTRANS),
-               .HREADY    (ahb3_zslave_HREADY),
-               .HREADYOUT (ahb3_zslave_HREADYOUT),
-               .HRESP     (ahb3_zslave_HRESP),
-               .HRDATA    (ahb3_zslave_HRDATA)
+               .HSEL      (ahb3_default_slave_HSEL),
+               .HTRANS    (ahb3_default_slave_HTRANS),
+               .HREADY    (ahb3_default_slave_HREADY),
+               .HREADYOUT (ahb3_default_slave_HREADYOUT),
+               .HRESP     (ahb3_default_slave_HRESP),
+               .HRDATA    (ahb3_default_slave_HRDATA)
                );
    
    // Enable master ports

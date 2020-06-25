@@ -8,7 +8,7 @@ filesets:
             - cm3_core
             - ahb3lite_memory
             - ahb3lite_apb_bridge
-            - ahb3lite_zslave
+            - ahb3lite_default_slave
             - apb4_gpio
         files:
             - rtl/cm3_min_soc.sv : {file_type : verilogSource}
@@ -62,8 +62,8 @@ generate:
                 ahb3_apb_brg:
                     offset: 0x40000000
                     size:   16
-                ahb3_zslave:
-                    idx:    3 # Force to last index
+                ahb3_default_slave:
+                    idx:    3 # Force last slave
                     offset: 0
                     size:   0xffffffff
 

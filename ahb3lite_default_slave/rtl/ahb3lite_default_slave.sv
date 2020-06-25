@@ -1,12 +1,11 @@
 /**
  *  AHB3lite default slave - Handle non-matching requests and return ERROR.
- *  Note: It's named zslave bc the fusesoc gen framework sorts the clients alphabetically.
  * 
  *  Tiny Labs Inc
  *  2020
  */
 
-module ahb3lite_zslave 
+module ahb3lite_default_slave 
   (
    input               CLK,
    input               RESETn,
