@@ -53,8 +53,6 @@ Again, you should see LD4 blinking
 * Up to 240 IRQs supported (not tested)
 * Synthesizable ONLY with Vivado
 ### Help! Things that need fixing:
-* Implied RAM generates a bunch of warnings in Vivado, would be nice to know if these are valid and if so how to fix them.
-* The top level timings constraints could be improved. They may be altogether wrong, any help here would be much appreciated.
 * A fusesoc generator for the APB bus would be useful to add additional APB peripherals.
 * Additional core targets for popular boards that are supported by the fusesoc (edalize) backend would be great.
 * More testing all around.
