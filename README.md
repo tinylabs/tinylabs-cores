@@ -48,7 +48,7 @@ Again, you should see LD4 blinking
 * Synthesizable on non-Xilinx FPGAs
 #### AT426 Attributes
 * EDA optimizable
-* Runs up to 40MHz (in my tests)
+* Runs up to 50MHz (in my tests)
 * Uses 59% of LUTs
 * Up to 240 IRQs supported (not tested)
 * Synthesizable ONLY with Vivado
