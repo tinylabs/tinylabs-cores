@@ -84,12 +84,27 @@ int main(int argc, char **argv, char **env)
 	top->trace(tbUtils->tfp, 99);
 
 	while (tbUtils->doCycle() && !done) {
+      static uint8_t tms_pval = 0;
+      static uint64_t ptime = 0;
 		if (tbUtils->getTime() > RESET_TIME)
 			top->PORESETn = 1;
 
 		top->eval();
         top->CLK = !top->CLK;
-		tbUtils->doJTAG(&top->TMS_SWDIN, &top->TDI, &top->TCK_SWDCLK, top->TDO);
+		tbUtils->doJTAG (&top->TMS_SWDIN, &top->TDI, &top->TCK_SWDCLK, top->TDO);
+
+        /* Detect glitches on TMS - Remove when fixed
+         * Not convinced this is actually the reason why JTAG on sim isn't working 
+         */
+        if (top->TMS_SWDIN != tms_pval) {
+          uint64_t time = tbUtils->getTime();
+
+          if ((time > 10) && ((time - ptime) < 4)) {
+            printf ("Found glitch at %" PRIu64 "\n", time);
+          }
+          tms_pval = top->TMS_SWDIN;
+          ptime = time;
+        }
 	}
 
 	//printf("Simulation ended at PC = %08x (%lu)\n",
