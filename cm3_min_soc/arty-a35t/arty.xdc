@@ -4,7 +4,7 @@ set_property CONFIG_VOLTAGE 3.3 [current_design]
 
 # Pin placement
 set_property -dict { PACKAGE_PIN E3    IOSTANDARD LVCMOS33 } [get_ports { CLK_100M }];
-set_property -dict { PACKAGE_PIN D9    IOSTANDARD LVCMOS33 } [get_ports { RESET }];
+set_property -dict { PACKAGE_PIN D9    IOSTANDARD LVCMOS33 } [get_ports { RESET }];   # BTN0
 
 # JTAG
 set_property -dict { PACKAGE_PIN P17   IOSTANDARD LVCMOS33 } [get_ports { TCK_SWDCLK }];  # IO13
@@ -13,13 +13,20 @@ set_property -dict { PACKAGE_PIN U18   IOSTANDARD LVCMOS33 } [get_ports { TDO }]
 set_property -dict { PACKAGE_PIN V17   IOSTANDARD LVCMOS33 } [get_ports { TMS_SWDIO }];   # IO10
 
 # GPIOs
-set_property -dict { PACKAGE_PIN H5    IOSTANDARD LVCMOS33 } [get_ports { GPIO0 }];
+set_property -dict { PACKAGE_PIN B9    IOSTANDARD LVCMOS33 } [get_ports { GPIO[0] }]; # BTN2
+set_property -dict { PACKAGE_PIN B8    IOSTANDARD LVCMOS33 } [get_ports { GPIO[1] }]; # BTN3
+set_property -dict { PACKAGE_PIN H5    IOSTANDARD LVCMOS33 } [get_ports { GPIO[2] }]; # LED4
+set_property -dict { PACKAGE_PIN T9    IOSTANDARD LVCMOS33 } [get_ports { GPIO[3] }]; # LED6
+set_property -dict { PACKAGE_PIN T10   IOSTANDARD LVCMOS33 } [get_ports { GPIO[4] }]; # LED7
+set_property -dict { PACKAGE_PIN E1    IOSTANDARD LVCMOS33 } [get_ports { GPIO[5] }]; # LED0-blue
+set_property -dict { PACKAGE_PIN F6    IOSTANDARD LVCMOS33 } [get_ports { GPIO[6] }]; # LED0-grn
+set_property -dict { PACKAGE_PIN G6    IOSTANDARD LVCMOS33 } [get_ports { GPIO[7] }]; # LED0-red
 
 # System clock
 create_clock -add -name sys_clk_pin -period 10.00 -waveform {0 5} [get_ports { CLK_100M }];
 
-# 10MHz JTAG/SWD clock
-create_clock -add -name jtag_clk -period 100.00 -waveform {0 50} [get_ports { TCK_SWDCLK }];
+# 5MHz JTAG/SWD clock
+create_clock -add -name jtag_clk -period 200.00 -waveform {0 100} [get_ports { TCK_SWDCLK }];
 
 # Ignore timing on async reset
 set_false_path -from [get_ports { RESET }]
@@ -47,7 +54,7 @@ set debug_od 5.0
 set debug_id 5.0
 
 # Create virtual clock for IO
-create_clock -name slow_clk -period 100.0
+create_clock -name slow_clk -period 1000.0
 
 # SWDIO
 # SWDIO is driven at both ends by posedge clk.  The clock is sourced from the DAPLink board

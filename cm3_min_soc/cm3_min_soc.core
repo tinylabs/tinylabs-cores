@@ -33,10 +33,11 @@ filesets:
 
     support:
         files:
-            - scripts/cortexm3sim.cfg : {file_type : user}
-            - fw/blinky.bin : {file_type : user}
-            - fw/blinky_sim.bin : {file_type : user}
-            - fw/blinky.hex : {file_type : user}
+            - scripts/cortexm3sim.cfg
+            - fw/blinky.bin
+            - fw/blinky_sim.bin
+            - fw/blinky.hex
+        file_type: user
             
     arty_constraints:
         files:
@@ -61,7 +62,7 @@ generate:
                     size:   16384
                 ahb3_apb_brg:
                     offset: 0x40000000
-                    size:   16
+                    size:   64
                 ahb3_default_slave:
                     idx:    3 # Force last slave
                     offset: 0
@@ -83,7 +84,7 @@ targets:
             verilator:
                 verilator_options: [-sv, --cc, --trace, --clk, CLK]
                 #make_options: [OPT_FAST=-Ofast]
-                run_options: [--vcd=sim.vcd, --timeout=1000, --bin-load=../src/cm3_min_soc_0.1/fw/blinky_sim.bin]
+                run_options: [--vcd=sim.vcd, --timeout=3000, --bin-load=../src/cm3_min_soc_0.1/fw/blinky_sim.bin]
 
     synth_arty:
         <<: *base

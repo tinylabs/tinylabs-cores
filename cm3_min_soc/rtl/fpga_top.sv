@@ -20,7 +20,7 @@ module fpga_top
       inout  TMS_SWDIO,
       output TDO,
       // GPIO port
-      inout wire   GPIO0
+      inout  [7:0] GPIO
       );
 
 
@@ -34,8 +34,8 @@ module fpga_top
          // Full CM3 core PLL timing
          PLLE2_BASE #(
                       .BANDWIDTH ("OPTIMIZED"),
-                      .CLKFBOUT_MULT (10),
-                      .CLKOUT0_DIVIDE(20),    // 50MHz
+                      .CLKFBOUT_MULT (9),
+                      .CLKOUT0_DIVIDE(20),    // 45MHz
                       .CLKFBOUT_PHASE(0.0),   // Phase offset in degrees of CLKFB, (-360-360)
                       .CLKIN1_PERIOD(10.0),   // 100MHz input clock
                       .CLKOUT0_DUTY_CYCLE(0.5),
@@ -109,9 +109,12 @@ module fpga_top
    assign TMS_SWDIO = swdoe ? swdout : 1'bz;
 
    // Inferred BUFIO  for gpio
-   logic [7:0]         gpio_i, gpio_o, gpio_oe;
-   assign GPIO0 = gpio_oe[0] ? gpio_o[0] : 1'bz;
-   assign gpio_i = {7'h0, GPIO0};
+   logic [7:0]         gpio_o, gpio_oe;
+   generate
+      genvar           i;
+      for (i = 0; i < 8; i++)
+        assign GPIO[i] = gpio_oe[i] ? gpio_o[i] : 1'bz;
+   endgenerate
 
    // Instantiate soc
    cm3_min_soc
@@ -131,7 +134,7 @@ module fpga_top
           .SWDOUT     (swdout),
           .SWDOUTEN   (swdoe),
           .GPIO_O     (gpio_o),
-          .GPIO_I     (gpio_i),
+          .GPIO_I     (GPIO),
           .GPIO_OE    (gpio_oe)
           );
    

@@ -27,11 +27,11 @@ module cm3_min_soc
      // 8-bit GPIO port
      output logic [7:0] GPIO_O,
      output logic [7:0] GPIO_OE,
-     input wire [7:0]   GPIO_I
+     input        [7:0] GPIO_I
    );
 
    // Implicit reset for autogen interconnect
-   logic                RESETn;
+   logic           RESETn;
    assign RESETn = PORESETn;   
 
    // Include generated AHB3lite interconnect crossbar
@@ -39,20 +39,31 @@ module cm3_min_soc
 
    // APB4 local bus
    // TODO: Create generator so more peripherals can be added via mux generation
-   localparam  APB4_PDATA_SIZE = 8;
-   localparam  APB4_PADDR_SIZE = 8;
-   logic                           apb4_PSEL, apb4_PENABLE, apb4_PWRITE, apb4_PREADY, apb4_PSLVERR;
+   localparam  APB4_PDATA_SIZE = 32;
+   localparam  APB4_PADDR_SIZE = 7;
+   logic                           apb4_PSEL,
+                                   apb4_PENABLE,
+                                   apb4_PWRITE,
+                                   apb4_PREADY,
+                                   apb4_PSLVERR;
    logic [2:0]                     apb4_PPROT;
    logic [(APB4_PDATA_SIZE/8)-1:0] apb4_PSTRB;
    logic [APB4_PADDR_SIZE-1:0]     apb4_PADDR;
-   logic [APB4_PADDR_SIZE-1:0]     apb4_PWDATA;
-   logic [APB4_PADDR_SIZE-1:0]     apb4_PRDATA;   
+   logic [APB4_PDATA_SIZE-1:0]     apb4_PWDATA;
+   logic [APB4_PDATA_SIZE-1:0]     apb4_PRDATA;   
    
    // IRQs to cm3 core
    logic [15:0] irq;
    
    // GPIO IRQ on 0 (IRQ16)
-   logic        gpio_irq;
+   logic                       gpio_irq;
+   logic [APB4_PDATA_SIZE-1:0] gpio_i;
+   logic [APB4_PDATA_SIZE-1:0] gpio_o;
+   logic [APB4_PDATA_SIZE-1:0] gpio_oe;
+   assign gpio_i = {24'h0, GPIO_I};
+   assign GPIO_O = gpio_o[7:0];
+   assign GPIO_OE = gpio_oe[7:0];
+   
    assign irq = {15'h0, gpio_irq};
 
    // CPU reset controller
@@ -169,16 +180,16 @@ module cm3_min_soc
                  .PENABLE   (apb4_PENABLE),
                  .PWRITE    (apb4_PWRITE),
                  .PSTRB     (apb4_PSTRB),
-                 .PADDR     (apb4_PADDR[3:0]),
+                 .PADDR     (apb4_PADDR[5:2]), // Mask out correct address range
                  .PWDATA    (apb4_PWDATA),
                  .PRDATA    (apb4_PRDATA),
                  .PREADY    (apb4_PREADY),
                  .PSLVERR   (apb4_PSLVERR),
                  // GPIO/IRQ out
                  .irq_o     (gpio_irq),
-                 .gpio_i    (GPIO_I),
-                 .gpio_o    (GPIO_O),
-                 .gpio_oe   (GPIO_OE)
+                 .gpio_i    (gpio_i),
+                 .gpio_o    (gpio_o),
+                 .gpio_oe   (gpio_oe)
                  );
 
    // Default slave to handle bad requests
