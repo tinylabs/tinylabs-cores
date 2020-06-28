@@ -1,0 +1,24 @@
+CAPI=2:
+name: ::verilator_utils:0.1
+description: Verilator test bench utility class
+
+filesets:
+    cpp:
+        depend:
+            - elf-loader
+        files:
+            - verilator_utils.cpp
+            - verilator_utils.h : {is_include_file : true}
+            - JTAGServer.cpp
+            - JTAGServer.h : {is_include_file : true}
+            - readerwriterqueue.h : {is_include_file : true}
+            - atomicops.h : {is_include_file : true}
+        file_type : cppSource
+
+targets:
+    default:
+        filesets : [cpp]
+        tools:
+            verilator:
+                libs: [-lpthread]
+                

@@ -27,7 +27,7 @@ filesets:
             
     verilator_tb:
         depend:
-            - verilator_tb_utils
+            - verilator_utils
         files:
             - bench/verilator/tb.cpp : {file_type : cppSource}
 
@@ -83,7 +83,7 @@ targets:
         tools:
             verilator:
                 verilator_options: [-sv, --cc, --trace, --clk, CLK]
-                #make_options: [OPT_FAST=-Ofast]
+                make_options: [OPT_FAST=-Ofast]
                 run_options: [--vcd=sim.vcd, --timeout=3000, --bin-load=../src/cm3_min_soc_0.1/fw/blinky_sim.bin]
 
     synth_arty:

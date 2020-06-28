@@ -14,7 +14,7 @@
 #include <stdint.h>
 #include <signal.h>
 #include <argp.h>
-#include <verilator_tb_utils.h>
+#include <verilator_utils.h>
 
 #include "Vcm3_min_soc.h"
 
@@ -26,9 +26,9 @@ vluint64_t main_time = 0;       // Current simulation time
 // This is a 64-bit integer to reduce wrap over issues and
 // allow modulus.  You can also use a double, if you wish.
 
-double sc_time_stamp () {       // Called by $time in Verilog
-  return main_time;           // converts to double, to match
-  // what SystemC does
+double sc_time_stamp () {   // Called by $time in Verilog
+  return main_time;        // converts to double, to match
+                           // what SystemC does
 }
 
 void INThandler(int signal)
@@ -49,19 +49,19 @@ static int parse_opt(int key, char *arg, struct argp_state *state)
 	return 0;
 }
 
-static int parse_args(int argc, char **argv, VerilatorTbUtils* tbUtils)
+static int parse_args(int argc, char **argv, VerilatorUtils* utils)
 {
 	struct argp_option options[] = {
 		// Add custom options here
 		{ 0 }
 	};
 	struct argp_child child_parsers[] = {
-		{ &verilator_tb_utils_argp, 0, "", 0 },
+		{ &verilator_utils_argp, 0, "", 0 },
 		{ 0 }
 	};
 	struct argp argp = { options, parse_opt, 0, 0, child_parsers };
 
-	return argp_parse(&argp, argc, argv, 0, 0, tbUtils);
+	return argp_parse(&argp, argc, argv, 0, 0, utils);
 }
 
 int main(int argc, char **argv, char **env)
@@ -72,32 +72,31 @@ int main(int argc, char **argv, char **env)
 	Verilated::commandArgs(argc, argv);
 
 	Vcm3_min_soc* top = new Vcm3_min_soc;
-	VerilatorTbUtils* tbUtils =
-      new VerilatorTbUtils(top->cm3_min_soc__DOT__u_rom__DOT__ram_inst__DOT__genblk2__DOT__genblk2__DOT__ram_inst__DOT__mem_array);
+	VerilatorUtils* utils =
+      new VerilatorUtils(top->cm3_min_soc__DOT__u_rom__DOT__ram_inst__DOT__genblk2__DOT__genblk2__DOT__ram_inst__DOT__mem_array);
     
-	parse_args(argc, argv, tbUtils);
-
+	parse_args(argc, argv, utils);
 	signal(SIGINT, INThandler);
 
     top->CLK = 0;
     top->PORESETn = 0;
-	top->trace(tbUtils->tfp, 99);
+	top->trace(utils->tfp, 99);
 
-	while (tbUtils->doCycle() && !done) {
-		if (tbUtils->getTime() > RESET_TIME)
+	while (utils->doCycle() && !done) {
+		if (utils->getTime() > RESET_TIME)
 			top->PORESETn = 1;
 
 		top->eval();
         top->CLK = !top->CLK;
-		tbUtils->doJTAG (&top->TMS_SWDIN, &top->TDI, &top->TCK_SWDCLK, top->TDO);
+		utils->doJTAGServer (&top->TMS_SWDIN, &top->TDI, &top->TCK_SWDCLK, top->TDO, 0, &top->PORESETn);
 
         // Trigger interrupt
-        if ((tbUtils->getTime() >= 800) && (tbUtils->getTime() < 810))
+        if ((utils->getTime() >= 800) && (utils->getTime() < 810))
           top->GPIO_I = 1;
         else
           top->GPIO_I = 0;
 	}
 
-	delete tbUtils;
+	delete utils;
 	exit(0);
 }
