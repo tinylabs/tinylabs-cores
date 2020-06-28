@@ -8,9 +8,9 @@
 module fpga_top 
   #(
     parameter XILINX_ENC_CM3 = 0,
-    parameter ROM_SZ = 16384,
-    parameter RAM_SZ = 16384,
-    parameter ROM_FILE = ""
+    parameter ROM_SZ         = 0,
+    parameter RAM_SZ         = 0,
+    parameter ROM_FILE       = ""
     )(
       input  CLK_100M,
       input  RESET,

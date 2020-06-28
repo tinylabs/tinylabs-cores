@@ -56,10 +56,10 @@ generate:
             slaves:
                 ahb3_rom:
                     offset: 0
-                    size:   16384
+                    size:   32768
                 ahb3_ram:
                     offset: 0x20000000
-                    size:   16384
+                    size:   32768
                 ahb3_apb_brg:
                     offset: 0x40000000
                     size:   64
@@ -91,7 +91,7 @@ targets:
         description: Synthesize obsfucated CM3 SoC for Digilent Arty-A35T (30MHz)
         default_tool: vivado
         filesets_append: [fpga_top, arty_constraints]
-        parameters: [XILINX_ENC_CM3=0,ROM_FILE=../src/cm3_min_soc_0.1/fw/blinky.hex]
+        parameters: [XILINX_ENC_CM3=0,ROM_SZ,RAM_SZ,ROM_FILE=../src/cm3_min_soc_0.1/fw/blinky.hex]
         toplevel: [fpga_top]
         tools:
             vivado:
@@ -103,7 +103,7 @@ targets:
         description: Synthesize encrypted CM3 SoC for Digilent Arty-A35T (50MHz)
         default_tool: vivado
         filesets_append: [cm3_full_dep, fpga_top, arty_constraints]
-        parameters: [XILINX_ENC_CM3=1,ROM_FILE=../src/cm3_min_soc_0.1/fw/blinky.hex]
+        parameters: [XILINX_ENC_CM3=1,ROM_SZ,RAM_SZ,ROM_FILE=../src/cm3_min_soc_0.1/fw/blinky.hex]
         toplevel: [fpga_top]
         tools:
             vivado:
@@ -123,12 +123,12 @@ parameters:
         
     ROM_SZ:
         datatype: int
-        default: 16384
+        default: 32786
         description: Set size of ROM
         paramtype: vlogparam
 
     RAM_SZ:
         datatype: int
-        default: 16384
+        default: 32768
         description: Set size of RAM
         paramtype: vlogparam
