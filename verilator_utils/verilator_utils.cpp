@@ -11,7 +11,7 @@
 VerilatorUtils::VerilatorUtils(uint32_t *mem)
   : mem(mem), t(0), timeout(0), vcdDump(false), vcdDumpStart(0), vcdDumpStop(0),
     vcdFileName((char *)VCD_DEFAULT_NAME), jtagServerEnable(false),
-    jtagServerPort(5555) {
+    jtagServerPort(2345) {
   tfp = new VerilatedVcdC;
   jtag_server = new JTAGServer (8);
     
@@ -22,6 +22,8 @@ VerilatorUtils::VerilatorUtils(uint32_t *mem)
 VerilatorUtils::~VerilatorUtils() {
     if (vcdDumping)
       tfp->close();
+    // Stop JTAG server
+    delete jtag_server;
 }
 
 bool VerilatorUtils::doJTAGServer (uint8_t *tms, uint8_t *tdi, uint8_t *tck, uint8_t tdo, uint8_t swdo, uint8_t *srst) {

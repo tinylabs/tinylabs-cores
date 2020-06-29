@@ -10,7 +10,7 @@ extern struct argp verilator_utils_argp;
 
 class VerilatorUtils {
 public:
-  VerilatorUtils(uint32_t *mem);
+  VerilatorUtils(uint32_t *mem=NULL);
   ~VerilatorUtils();
 
   VerilatedVcdC* tfp;

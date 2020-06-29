@@ -36,8 +36,9 @@ set hclk_period [get_property PERIOD [get_clocks hclk ]]
 set jtag_period [get_property PERIOD [get_clocks jtag_clk ]]
 
 # DAP and CPU are asynchronous, this should ensure that everything is setup for CDC
-set_max_delay -from [get_clocks hclk] -to [get_clocks jtag_clk] -datapath_only [expr { $hclk_period - 1 }]
-set_max_delay -from [get_clocks jtag_clk] -to [get_clocks hclk] -datapath_only [expr { $hclk_period - 1 }]
+#set_max_delay -from [get_clocks hclk] -to [get_clocks jtag_clk] -datapath_only [expr { $hclk_period - 1 }]
+#set_max_delay -from [get_clocks jtag_clk] -to [get_clocks hclk] -datapath_only [expr { $hclk_period - 1 }]
+set_clock_groups -asynchronous -group [get_clocks sys_clk_pin] -group [get_clocks jtag_clk]
 
 #
 # BELOW is taken from m3_for_arty_a7 contraints... No idea how it is calculated
