@@ -10,10 +10,12 @@
 
 VerilatorUtils::VerilatorUtils(uint32_t *mem)
   : mem(mem), t(0), timeout(0), vcdDump(false), vcdDumpStart(0), vcdDumpStop(0),
-    vcdFileName((char *)VCD_DEFAULT_NAME), jtagServerEnable(false),
-    jtagServerPort(2345) {
+    vcdFileName((char *)VCD_DEFAULT_NAME),
+    jtagServerEnable(false), jtagServerPort(2345),
+    uartServerEnable(false), uartServerPort(7777) {
   tfp = new VerilatedVcdC;
   jtag_server = new JTAGServer (8);
+  uart_server = new UARTServer (0);
     
   Verilated::traceEverOn(true);
   printf("Tracing on\n");
@@ -24,6 +26,7 @@ VerilatorUtils::~VerilatorUtils() {
       tfp->close();
     // Stop JTAG server
     delete jtag_server;
+    delete uart_server;
 }
 
 bool VerilatorUtils::doJTAGServer (uint8_t *tms, uint8_t *tdi, uint8_t *tck, uint8_t tdo, uint8_t swdo, uint8_t *srst) {
@@ -32,6 +35,13 @@ bool VerilatorUtils::doJTAGServer (uint8_t *tms, uint8_t *tdi, uint8_t *tck, uin
     srst = &dummy; 
   if (jtagServerEnable)
     jtag_server->doJTAGServer (t, tms, tdi, tck, tdo, swdo, srst);
+  return true;
+}
+
+bool VerilatorUtils::doUARTServer (uint8_t tx, uint8_t *rx)
+{
+  if (uartServerEnable)
+    uart_server->doUARTServer (t, tx, rx);
   return true;
 }
 
@@ -129,6 +139,7 @@ static struct argp_option options[] = {
   { "vcdstop", 't', "VAL", 0, "Terminate VCD generation at VAL" },
   { 0, 0, 0, 0, "Remote debugging:", 3 },
   { "jtag-server", 'j', "PORT", OPTION_ARG_OPTIONAL, "Enable openocd JTAG server, opt. specify PORT" },
+  { "uart-server", 'u', "PORT", OPTION_ARG_OPTIONAL, "Enable uart host server, opt. specify PORT" },
   { 0 },
 };
 
@@ -172,6 +183,13 @@ int VerilatorUtils::parseOpts(int key, char *arg, struct argp_state *state) {
       utils->jtag_server->Start (utils->jtagServerPort);
     break;
 
+  case 'u':
+    utils->uartServerEnable = true;
+    if (arg)
+      utils->uartServerPort = atoi (arg);
+    utils->uart_server->Start (utils->uartServerPort);
+    break;
+    
   default:
     return ARGP_ERR_UNKNOWN;
   }

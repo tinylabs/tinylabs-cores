@@ -11,6 +11,8 @@ filesets:
             - verilator_utils.h : {is_include_file : true}
             - JTAGServer.cpp
             - JTAGServer.h : {is_include_file : true}
+            - UARTServer.cpp
+            - UARTServer.h : {is_include_file : true}
             - Server.cpp
             - Server.h : {is_include_file : true}
             - readerwriterqueue.h : {is_include_file : true}

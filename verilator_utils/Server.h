@@ -23,11 +23,11 @@ class Server {
   uint16_t port;
   pthread_t thread_id;
   bool debug;
-  bool running;
   void Listen (void);
   void Send (int sockfd, char *buf, int len);
 
  protected:
+  bool running;
   uint32_t period;
   mc::ReaderWriterQueue<uint8_t> rx, tx;
 

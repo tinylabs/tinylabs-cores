@@ -5,6 +5,7 @@
 #include <verilated.h>
 #include <verilated_vcd_c.h>
 #include "JTAGServer.h"
+#include "UARTServer.h"
 
 extern struct argp verilator_utils_argp;
 
@@ -16,16 +17,17 @@ public:
   VerilatedVcdC* tfp;
 
   JTAGServer *jtag_server;
+  UARTServer *uart_server;
 
   bool doCycle();
   bool doJTAGServer (uint8_t *tms, uint8_t *tdi, uint8_t *tck, uint8_t tdo, uint8_t swdo=0, uint8_t *srst=NULL);
+  bool doUARTServer (uint8_t tx, uint8_t *rx);
   uint64_t getTime() { return t; }
   uint64_t getTimeout() { return timeout; }
   bool getVcdDump() { return vcdDump; }
   uint64_t getVcdDumpStart() { return vcdDumpStart; }
   uint64_t getVcdDumpStop() { return vcdDumpStop; }
   char *getVcdFileName() { return vcdFileName; }
-
   bool getJtagEnable() { return jtagServerEnable; }
   int getJtagPort() { return jtagServerPort; }
 
@@ -44,6 +46,8 @@ private:
 
   bool jtagServerEnable;
   int jtagServerPort;
+  bool uartServerEnable;
+  int uartServerPort;
 
   uint32_t *mem;
 

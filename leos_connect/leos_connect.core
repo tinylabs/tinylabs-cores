@@ -1,0 +1,145 @@
+CAPI=2:
+name: ::leos_connect:0.1
+description: ARM development and debug platform
+
+filesets:
+    rtl:
+        depend:
+            - cm3_core
+            - ahb3lite_memory
+            - fifo
+            - ahb3lite_host_bridge
+            - uart_transport
+        files:
+            - rtl/leos_connect.sv : {file_type : verilogSource}
+
+    fpga_top:
+        files:
+            - rtl/fpga_top.sv : {file_type : verilogSource}
+
+    cm3_full_dep:
+        depend:
+            - cm3_full
+            
+    ahb3lite_intercon_dep:
+        depend:
+            - ahb3lite_intercon
+            
+    verilator_tb:
+        depend:
+            - verilator_utils
+        files:
+            - bench/verilator/tb.cpp : {file_type : cppSource}
+
+    support:
+        files:
+            - scripts/cortexm3sim.cfg
+            - fw/blinky.bin
+            - fw/blinky_sim.bin
+            - fw/blinky.hex
+        file_type: user
+            
+    arty_constraints:
+        files:
+            - arty-a35t/arty.xdc : {file_type : xdc}
+            - scripts/vivado.tcl : {file_type : tclSource}
+            
+generate:
+    soc_intercon:
+        generator: ahb3lite_intercon_gen
+        parameters:
+            masters:
+                ahb3_cm3_code:
+                    priority: 0
+                ahb3_cm3_sys:
+                    priority: 0
+                ahb3_host_mst:
+                    priority: 1
+            slaves:
+                ahb3_rom:
+                    offset: 0
+                    size:   16384
+                ahb3_ram:
+                    offset: 0x20000000
+                    size:   16384
+                ahb3_host_slv:                   
+                    idx:    3 # Force last slave
+                    offset: 0x0
+                    size:   0xffffffff
+
+targets:
+    default: &base
+        generate: [soc_intercon]
+        filesets: [ahb3lite_intercon_dep, rtl, support]
+        parameters: [XILINX_ENC_CM3=0,ROM_SZ,RAM_SZ,HOST_CLK_FREQ,HOST_BAUD]
+
+    sim:
+        <<: *base
+        description: Simulate CM3 SoC using verilator
+        default_tool: verilator
+        filesets_append: [verilator_tb]
+        toplevel: [leos_connect]
+        tools:
+            verilator:
+                verilator_options: [-sv, --cc, --trace, --clk, CLK]
+                #make_options: [OPT_FAST=-Ofast]
+                run_options: [--vcd=sim.vcd, --timeout=3000, --bin-load=../src/leos_connect_0.1/fw/blinky_sim.bin]
+
+    synth_arty:
+        <<: *base
+        description: Synthesize obsfucated CM3 SoC for Digilent Arty-A35T (30MHz)
+        default_tool: vivado
+        filesets_append: [fpga_top, arty_constraints]
+        parameters: [XILINX_ENC_CM3=0,ROM_SZ,RAM_SZ,ROM_FILE=../src/leos_connect_0.1/fw/blinky.hex]
+        toplevel: [fpga_top]
+        tools:
+            vivado:
+                part: xc7a35ticsg324-1L
+                #vivado-settings: /opt/xilinx/Vivado/2020.1/settings64.sh
+
+    synth_arty_full:
+        <<: *base
+        description: Synthesize encrypted CM3 SoC for Digilent Arty-A35T (50MHz)
+        default_tool: vivado
+        filesets_append: [cm3_full_dep, fpga_top, arty_constraints]
+        parameters: [XILINX_ENC_CM3=1,ROM_SZ,RAM_SZ,ROM_FILE=../src/leos_connect_0.1/fw/blinky.hex]
+        toplevel: [fpga_top]
+        tools:
+            vivado:
+                part: xc7a35ticsg324-1L
+                #vivado-settings: /opt/xilinx/Vivado/2020.1/settings64.sh
+        
+parameters:
+    XILINX_ENC_CM3:
+        datatype: int
+        description: Synthesize encrypted cortex-m3 core in Vivado
+        paramtype: vlogparam
+
+    ROM_FILE:
+        datatype: str
+        description: Boot file in readmemh format (xxd -e <bin> | xxd -r | xxd -p -c4)
+        paramtype: vlogparam
+        
+    ROM_SZ:
+        datatype: int
+        default: 16384
+        description: Set size of ROM
+        paramtype: vlogparam
+
+    RAM_SZ:
+        datatype: int
+        default: 16384
+        description: Set size of RAM
+        paramtype: vlogparam
+
+    HOST_CLK_FREQ:
+        datatype: int
+        default: 50000000
+        description: Frequency of host transport
+        paramtype: vlogparam
+
+    HOST_BAUD:
+        datatype: int
+        default: 1562500
+        description: Frequency of host transport
+        paramtype: vlogparam

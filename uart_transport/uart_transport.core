@@ -1,0 +1,17 @@
+CAPI=2:
+name: ::uart_transport:0.1
+description: UART transport for host bridge
+
+filesets:
+    rtl:
+        files:
+            - rtl/baud_rate_gen.v
+            - rtl/receiver.v
+            - rtl/transmitter.v
+            - rtl/uart_transport.v
+        file_type: verilogSource
+
+targets:
+    default:
+        filesets : [rtl]
+        
