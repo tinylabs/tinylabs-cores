@@ -1,0 +1,53 @@
+CAPI=2:
+name: ::fifo_arb_rx:0.1
+description: Arbiter for two clients on one source FIFO
+
+filesets:
+    rtl:
+        depend:
+            - fifo
+        files:
+            - rtl/fifo_arb_rx.sv
+        file_type : verilogSource
+        
+    tb:
+        files:
+            - bench/fifo_arb_rx_tb.v
+            - bench/fifo_tester.v
+            - bench/fifo_reader1.v
+        file_type : verilogSource
+        depend: [">=vlog_tb_utils-1.0"]
+        
+targets:
+    default:
+        filesets : [rtl]
+
+    sim:
+        default_tool : icarus
+        tools:
+            icarus:
+                iverilog_options: [-g2012]
+        filesets : [rtl, tb]
+        parameters : [read_rate, write_rate, data_width, depth_width]
+        toplevel : [fifo_arb_rx_tb]
+
+parameters:
+  read_rate:
+    datatype    : str
+    description : FIFO read rate
+    paramtype   : plusarg
+
+  write_rate:
+    datatype    : str
+    description : FIFO write rate
+    paramtype   : plusarg
+
+  data_width:
+    datatype    : int
+    description : FIFO data width
+    paramtype   : vlogparam
+
+  depth_width:
+    datatype    : int
+    description : 2**(FIFO depth)
+    paramtype   : vlogparam
