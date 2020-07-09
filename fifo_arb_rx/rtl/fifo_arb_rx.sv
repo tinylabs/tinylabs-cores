@@ -86,7 +86,7 @@ module fifo_arb_rx #(
    wire [DWIDTH-1:0]    cmd;
    
    // Mostly combinatorial logic
-   assign fifo_rden = ~fifo_rdempty;
+   assign fifo_rden = ~fifo_rdempty & ~c1_wrfull & ~c2_wrfull;
    assign c1_wrdata = fifo_rddata;
    assign c2_wrdata = fifo_rddata;
    assign sel = (dcnt != 0) ? sel :

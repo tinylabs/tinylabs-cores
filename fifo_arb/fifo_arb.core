@@ -1,0 +1,16 @@
+CAPI=2:
+name: ::fifo_arb:1.0
+
+filesets:
+    rtl:
+        depend:
+            - fifo_arb_rx
+            - fifo_arb_tx
+        files:
+            - rtl/fifo_arb.sv
+        file_type : verilogSource
+
+targets:
+    default:
+        description: FIFO bidirectional arbiter
+        filesets : [rtl]
