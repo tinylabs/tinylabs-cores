@@ -85,7 +85,7 @@ module fifo_tester
       integer 	    dw_idx;
       integer       cnt;
       
-      $urandom (seed);
+      //$urandom (seed);
       
       begin
 	     writer1.rate = 1.0;

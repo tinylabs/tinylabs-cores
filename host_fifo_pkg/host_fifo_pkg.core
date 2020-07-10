@@ -1,0 +1,13 @@
+CAPI=2:
+name: ::host_fifo_pkg:0.1
+
+filesets:
+    rtl:
+        files:
+            - rtl/host_fifo_pkg.sv
+        file_type : verilogSource
+
+targets:
+    default:
+        filesets : [rtl]
+

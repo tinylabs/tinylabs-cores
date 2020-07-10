@@ -6,6 +6,7 @@ filesets:
     rtl:
         depend:
             - fifo
+            - host_fifo_pkg
         files:
             - rtl/fifo_arb_tx.sv
         file_type : verilogSource

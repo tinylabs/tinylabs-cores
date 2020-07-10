@@ -35,6 +35,9 @@ module fifo_tester
     input wire           f2_empty_i
     );
 
+   // Host fifo definitions
+   import host_fifo_pkg::*;
+
    function [DW-1:0] randvec;
       integer            idx;
       
@@ -80,7 +83,7 @@ module fifo_tester
       reg [DW-1:0]  data;
       integer 	    dw_idx;
 
-      $urandom (seed);
+      //$urandom (seed);
       
       begin
 	     //Cap rate to [0.0-1.0]
@@ -118,7 +121,7 @@ module fifo_tester
       reg [DW-1:0]   received;
       reg [DW-1:0]   expected;
       reg [DW-1:0]   cmd;
-      reg [3:0]      cnt;
+      reg [host_fifo_pkg::FIFO_PAYLOAD_WIDTH-1:0] cnt;
       
       begin
 	     errors = 0;
@@ -130,15 +133,7 @@ module fifo_tester
 
               // Get expected
 	          cmd = mem[index % DEPTH];
-              cnt = (cmd >> cntshift) & cntmask;
-              case (cnt)
-                0: cnt = 0;
-                1: cnt = 1;
-                2: cnt = 2;
-                3: cnt = 4;
-                4: cnt = 8;
-                default : cnt = 0;
-              endcase // case (cnt)
+              cnt = host_fifo_pkg::fifo_payload ((cmd >> cntshift) & cntmask);
 
               // Clear idx
               cidx = 0;

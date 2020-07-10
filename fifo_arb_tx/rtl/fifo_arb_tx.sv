@@ -37,10 +37,12 @@ module fifo_arb_tx #(
     output [DWIDTH-1:0] fifo_wrdata        
     );
 
+   // Import common definitions
+   import host_fifo_pkg::*;
+
    // Calculate count shift
-   localparam CWIDTH = 3; //$countbits (CNTMASK, '1); doesn't work
-   localparam CSHIFT = $clog2 (CNTMASK) - CWIDTH;
-   localparam CMASK  = (2**CWIDTH) - 1;
+   localparam CSHIFT = $clog2 (CNTMASK) - FIFO_CNT_WIDTH;
+   localparam CMASK  = (2**FIFO_CNT_WIDTH) - 1;
    
    // Internal write logic to each fifo
    wire                 c1_rden, c2_rden;
@@ -79,14 +81,14 @@ module fifo_arb_tx #(
       .empty_o    (c2_rdempty)
       );
 
-   logic                data_valid;
-   logic                c1_prden, c2_prden;
-   logic                c1_psel, c2_psel;
-   logic [5:0]          dcnt;
-   wire [DWIDTH-1:0]    data;
-   wire                 hold;
-   wire                 c1_sel, c2_sel;
-
+   logic                          data_valid;
+   logic                          c1_prden, c2_prden;
+   logic                          c1_psel, c2_psel;
+   logic [FIFO_PAYLOAD_WIDTH-1:0] dcnt;
+   wire [DWIDTH-1:0]              data;
+   wire                           hold;
+   wire                           c1_sel, c2_sel;
+   
    // Debug only
    //wire [DWIDTH-1:0]    cmd;
    //assign cmd = data_valid && (dcnt == 0) ? data : cmd;
@@ -124,16 +126,7 @@ module fifo_arb_tx #(
 
              // Assign cnt
              if (data_valid && (dcnt == 0))
-               begin
-                  case ((data >> CSHIFT) & CMASK)
-                    CWIDTH'(0): dcnt <= 0;
-                    CWIDTH'(1): dcnt <= 1;
-                    CWIDTH'(2): dcnt <= 2;
-                    CWIDTH'(3): dcnt <= 4;
-                    CWIDTH'(4): dcnt <= 8;
-                    default: dcnt <= 0;
-                  endcase
-               end
+               dcnt <= fifo_payload ((data >> CSHIFT) & CMASK);
 
              // Data is valid if either enable was asserted last cycle
              if (c1_rden | c2_rden)

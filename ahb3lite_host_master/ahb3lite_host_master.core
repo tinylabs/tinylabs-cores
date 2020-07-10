@@ -1,0 +1,16 @@
+CAPI=2:
+name: ::ahb3lite_host_master:1.0
+
+filesets:
+    rtl:
+        depend:
+            - ahb3lite_pkg
+            - host_fifo_pkg
+        files:
+            - rtl/ahb3lite_host_master.sv
+        file_type : verilogSource
+
+targets:
+    default:
+        description: Host interface to AHB3lite master
+        filesets : [rtl]
