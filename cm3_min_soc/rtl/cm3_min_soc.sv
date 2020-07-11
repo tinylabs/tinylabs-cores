@@ -228,7 +228,7 @@ module cm3_min_soc
             .INTNMI       (1'b0),
             
             // Debug
-            .SWCLKTCK     (TCK_SWDCLK),
+            .SWCKTCK      (TCK_SWDCLK),
             .SWDITMS      (TMS_SWDIN),
             .SWDO         (SWDOUT),
             .SWDOEN       (SWDOUTEN),

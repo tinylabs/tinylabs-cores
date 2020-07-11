@@ -39,10 +39,11 @@ filesets:
             - fw/blinky.hex
         file_type: user
             
-    arty_constraints:
+    constraints:
         files:
-            - arty-a35t/arty.xdc : {file_type : xdc}
-            - scripts/vivado.tcl : {file_type : tclSource}
+            - vivado/clocks.xdc : {file_type : xdc}
+            - vivado/pins.xdc : {file_type : xdc}
+            - vivado/vivado.tcl : {file_type : tclSource}
             
 generate:
     soc_intercon:
@@ -86,11 +87,11 @@ targets:
                 #make_options: [OPT_FAST=-Ofast]
                 run_options: [--vcd=sim.vcd, --timeout=3000, --bin-load=../src/cm3_min_soc_0.1/fw/blinky_sim.bin]
 
-    synth_arty:
+    arty:
         <<: *base
         description: Synthesize obsfucated CM3 SoC for Digilent Arty-A35T (30MHz)
         default_tool: vivado
-        filesets_append: [fpga_top, arty_constraints]
+        filesets_append: [fpga_top, constraints]
         parameters: [XILINX_ENC_CM3=0,ROM_SZ,RAM_SZ,ROM_FILE=../src/cm3_min_soc_0.1/fw/blinky.hex]
         toplevel: [fpga_top]
         tools:
@@ -98,11 +99,11 @@ targets:
                 part: xc7a35ticsg324-1L
                 #vivado-settings: /opt/xilinx/Vivado/2020.1/settings64.sh
 
-    synth_arty_full:
+    arty_full:
         <<: *base
         description: Synthesize encrypted CM3 SoC for Digilent Arty-A35T (50MHz)
         default_tool: vivado
-        filesets_append: [cm3_full_dep, fpga_top, arty_constraints]
+        filesets_append: [cm3_full_dep, fpga_top, constraints]
         parameters: [XILINX_ENC_CM3=1,ROM_SZ,RAM_SZ,ROM_FILE=../src/cm3_min_soc_0.1/fw/blinky.hex]
         toplevel: [fpga_top]
         tools:

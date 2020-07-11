@@ -5,7 +5,7 @@ This repo contains fusesoc compatible cores and a sample ARM Cortex-M3 system on
 `pip install fusesoc`\
 `fusesoc init`
 * Verilator (if running sim)\
-apt-get install verilator
+`apt-get install verilator`
 * [Vivado](https://www.xilinx.com/support/download.html) (if synthesizing example SoC)
 * [ARM AT421 DesignStart Eval (CM3)](https://developer.arm.com/ip-products/designstart/eval)\
 _This is currently mirrored and linked from the fusesoc core so no need to download unless it's taken down_
@@ -24,10 +24,10 @@ _Alternatively you can add vivado-settings:path to the .core file_
 You can inspect the top level GPIO_O signal to see the blinking GPIO
 ## Synthesize for the [Arty board (A35T)](https://www.xilinx.com/products/boards-and-kits/arty.html)
 There are two targets for synthesis corresponding to the swappable Cortex-M3 cores released by ARM. The AT421 package contains an obsfucated/flattened core which is fully synthesizable but has fixed parameters and cannot be optimized by the EDA tools. We always use this for simulation but it can also be synthesiszed and run on an FPGA. The second core is in the AT426 package which contains encrypted RTL that can only be read by Vivado. Through trial and error I determined the interface was _almost_ identical which means we can blindly instantiate it and allow Vivado to decrypt it during compilation.
-### Building synth_arty (AT421 obsfucated core)
-`fusesoc run --target=synth_arty cm3_min_soc`\
+### Building arty (AT421 obsfucated core)
+`fusesoc run --target=arty cm3_min_soc`\
 On completion this will flash the Arty board if plugged in. You should see LD4 blinking.
-### Building synth_arty_full (AT426 encrypted core)
+### Building arty_full (AT426 encrypted core)
 * Create empty directory\
 `mkdir AT426; cd AT426`
 * Copy core file from tinylabs-cores\
@@ -37,7 +37,7 @@ On completion this will flash the Arty board if plugged in. You should see LD4 b
 `cd ../`\
 `fusesoc library add cm3_full $PWD/AT426`
 * Synthesize using encrypted CM3\
-`fusesoc run --target=synth_arty_full cm3_min_soc`\
+`fusesoc run --target=arty_full cm3_min_soc`\
 Again, you should see LD4 blinking
 #### AT421 Attributes
 * Plaintext interface

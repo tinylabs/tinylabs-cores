@@ -19,31 +19,31 @@ module cm3_core #(
                   )
    (
     // Clock and reset
-    input               FCLK,        // Free running clock
-    input               HCLK,        // System clock
-    input               PORESETn,    // Reset everything (including debug)
-    input               CPURESETn,   // Reset processor
+    input               FCLK, // Free running clock
+    (* dont_touch="true" *) input HCLK, // System clock
+    input               PORESETn, // Reset everything (including debug)
+    input               CPURESETn, // Reset processor
     output              SYSRESETREQ, // System reset request
     
     // IRQs
-    input [NUM_IRQ-1:0] INTISR,      // IRQs
-    input               INTNMI,      // Non-maskable IRQ
+    input [NUM_IRQ-1:0] INTISR, // IRQs
+    input               INTNMI, // Non-maskable IRQ
 
     // JTAG/SWD
-    input               SWCLKTCK,    // JTAG CLK/SWDCLK
-    input               SWDITMS,     // JTAG TMS/SWDIN
-    output logic        SWDO,        // SWDOUT
-    output logic        SWDOEN,      // SWDIO output enable
-    input               nTRST,       // JTAG reset
-    input               TDI,         // JTAG TDI
-    output logic        TDO,         // JTAG TDO
-    output logic        nTDOEN,      // TDO output enable
-    output logic        SWV,         // Optional serial wire viewer
+    (* dont_touch="true" *) input SWCKTCK, // JTAG CLK/SWDCLK
+    input               SWDITMS, // JTAG TMS/SWDIN
+    output logic        SWDO, // SWDOUT
+    output logic        SWDOEN, // SWDIO output enable
+    input               nTRST, // JTAG reset
+    input               TDI, // JTAG TDI
+    output logic        TDO, // JTAG TDO
+    output logic        nTDOEN, // TDO output enable
+    output logic        SWV, // Optional serial wire viewer
     
     // Core status
-    output logic        HALTED,      // Core halted by debug
-    output logic        LOCKUP,      // Core is locked up
-    output logic        JTAGNSW,     // Active debug interface (JTAG=1/SWD=0)
+    output logic        HALTED, // Core halted by debug
+    output logic        LOCKUP, // Core is locked up
+    output logic        JTAGNSW, // Active debug interface (JTAG=1/SWD=0)
     
     // AHB3lite code bus (muxed icode/dcode)
     output logic [31:0] code_HADDR,
@@ -71,7 +71,7 @@ module cm3_core #(
     input               sys_HRESP,
     input               sys_HREADY
     );
-
+   
    // ICODE AHB-lite bus interconnect
    wire                 hreadyi;
    wire [31:0]          hrdatai;
@@ -181,282 +181,282 @@ module cm3_core #(
            #(
              .NUM_IRQ   (NUM_IRQ)
              )
-         u_cm3_full (
-                     // Clocks
-                      .FCLK        (FCLK),
-                      .HCLK        (HCLK),
-                      .TRACECLKIN  (HCLK),
-                      .STCLK       (1'b1), // Not actual clock
-                      
-                      // Reset
-                      .PORESETn    (PORESETn),
-                      .SYSRESETn   (CPURESETn),
-                      .SYSRESETREQ (SYSRESETREQ),
-                      
-                      // Interrupts
-                      .INTISR      (INTISR),
-                      .INTNMI      (INTNMI),
-                      .AUXFAULT    (32'h0),
-                      
-                      // Debug
-                      .SWCLKTCK    (SWCLKTCK),
-                      .nTRST       (nTRST),
-                      .SWDITMS     (SWDITMS),
-                      .TDI         (TDI),
-                      .TDO         (TDO),
-                      .nTDOEN      (nTDOEN),
-                      .SWV         (SWV),
-                      .SWDO        (SWDO),
-                      .SWDOEN      (SWDOEN),
-                      .JTAGNSW     (JTAGNSW),
-                      
-                      // Power management
-                      .CDBGPWRUPREQ (cdbgpwrup),
-                      .CDBGPWRUPACK (cdbgpwrup),
-                      .EDBGRQ       (1'b0),      // What is this?
-                      .DBGRESTART   (1'b0),      // Multiproc debug support?
-                      .DBGRESTARTED (),
-                      .ISOLATEn     (1'b1),      // Isolate core power domain
-                      .RETAINn      (1'b1),      // Retain state in power down
-                      
-                      // Wakeup controller
-                      .WICENREQ     (1'b0),      // Wakeup req from PMIC?
-                      .WICENACK     (),
-                      .WAKEUP       (),
-                      
-                      // Clock gating/bypass
-                      .CGBYPASS     (1'b0),
-                      .RSTBYPASS    (1'b0),
-                      .GATEHCLK     (),
-                      
-                      // Miscellaneous
-                      .SE            (1'b0),     // Scan enable?
-                      .BIGEND        (1'b0),     // Always little endian
-                      .STCALIB       (26'h0),    // Systick calib
-                      .FIXMASTERTYPE (1'b1),     // Needs to be 1
-                      .TSVALUEB      (48'h0),    // TPIU timestamp
-                      .TSCLKCHANGE   (1'b0),     // Not used
-                      .MPUDISABLE    (1'b0),
-                      .DBGEN         (1'b1),
-                      .TXEV          (),         // TX event output
-                      .RXEV          (1'b0),     // RX event input
-                      .INTERNALSTATE (),
+         u_cm3 (
+                // Clocks
+                .FCLK        (FCLK),
+                .HCLK        (HCLK),
+                .TRACECLKIN  (HCLK),
+                .STCLK       (1'b1), // Not actual clock
+                
+                // Reset
+                .PORESETn    (PORESETn),
+                .SYSRESETn   (CPURESETn),
+                .SYSRESETREQ (SYSRESETREQ),
+                
+                // Interrupts
+                .INTISR      (INTISR),
+                .INTNMI      (INTNMI),
+                .AUXFAULT    (32'h0),
+                
+                // Debug
+                .SWCLKTCK    (SWCKTCK),
+                .nTRST       (nTRST),
+                .SWDITMS     (SWDITMS),
+                .TDI         (TDI),
+                .TDO         (TDO),
+                .nTDOEN      (nTDOEN),
+                .SWV         (SWV),
+                .SWDO        (SWDO),
+                .SWDOEN      (SWDOEN),
+                .JTAGNSW     (JTAGNSW),
+                
+                // Power management
+                .CDBGPWRUPREQ (cdbgpwrup),
+                .CDBGPWRUPACK (cdbgpwrup),
+                .EDBGRQ       (1'b0),      // What is this?
+                .DBGRESTART   (1'b0),      // Multiproc debug support?
+                .DBGRESTARTED (),
+                .ISOLATEn     (1'b1),      // Isolate core power domain
+                .RETAINn      (1'b1),      // Retain state in power down
+                
+                // Wakeup controller
+                .WICENREQ     (1'b0),      // Wakeup req from PMIC?
+                .WICENACK     (),
+                .WAKEUP       (),
+                
+                // Clock gating/bypass
+                .CGBYPASS     (1'b0),
+                .RSTBYPASS    (1'b0),
+                .GATEHCLK     (),
+                
+                // Miscellaneous
+                .SE            (1'b0),     // Scan enable?
+                .BIGEND        (1'b0),     // Always little endian
+                .STCALIB       (26'h0),    // Systick calib
+                .FIXMASTERTYPE (1'b1),     // Needs to be 1
+                .TSVALUEB      (48'h0),    // TPIU timestamp
+                .TSCLKCHANGE   (1'b0),     // Not used
+                .MPUDISABLE    (1'b0),
+                .DBGEN         (1'b1),
+                .TXEV          (),         // TX event output
+                .RXEV          (1'b0),     // RX event input
+                .INTERNALSTATE (),
 
-                      // Traceport - unused
-                      .TRACEDATA     (),
-                      .TRCENA        (),
-                      .TRACECLK      (),
-                      
-                      // HTM data - Not used
-                      .HTMDHADDR     (),
-                      .HTMDHTRANS    (),
-                      .HTMDHSIZE     (),
-                      .HTMDHBURST    (),
-                      .HTMDHPROT     (),
-                      .HTMDHWDATA    (),
-                      .HTMDHWRITE    (),
-                      .HTMDHRDATA    (),
-                      .HTMDHREADY    (),
-                      .HTMDHRESP     (),
-            
-                      // Core status
-                      .HALTED        (HALTED),     // Halted for debug
-                      .LOCKUP        (LOCKUP),     // Core is locked up
-                      .BRCHSTAT      (),
-                      .SLEEPING      (),
-                      .SLEEPDEEP     (),
-                      .SLEEPHOLDREQn (1'b1),
-                      .SLEEPHOLDACKn (),
-                      .ETMINTNUM     (),           // Current active interrupt
-                      .ETMINTSTAT    (),           // Interrupt activation status
-                      .CURRPRI       (),           // Current interrupt priority
-
-                      // ICODE AHB-lite bus
-                      .IFLUSH        (1'b0),       // Force icode flush?
-                      .HREADYI       (hreadyi),
-                      .HRDATAI       (hrdatai),
-                      .HRESPI        (hrespi),
-                      .HTRANSI       (htransi),
-                      .HSIZEI        (hsizei),
-                      .HADDRI        (haddri),
-                      .HBURSTI       (hbursti),
-                      .HPROTI        (hproti),
-                      .MEMATTRI      (memattri),
-                      
-                      // DCODE AHB-lite bus
-                      .HMASTERD      (hmasterd),
-                      .HREADYD       (hreadyd),
-                      .HRDATAD       (hrdatad),
-                      .HRESPD        (hrespd),
-                      .HTRANSD       (htransd),
-                      .HSIZED        (hsized),
-                      .HADDRD        (haddrd),
-                      .HBURSTD       (hburstd),
-                      .HPROTD        (hprotd),
-                      .HWRITED       (hwrited),
-                      .HWDATAD       (hwdatad),
-                      .MEMATTRD      (memattrd),
-                      .EXREQD        (exreqd),
-                      .EXRESPD       (exrespd),
+                // Traceport - unused
+                .TRACEDATA     (),
+                .TRCENA        (),
+                .TRACECLK      (),
+                
+                // HTM data - Not used
+                .HTMDHADDR     (),
+                .HTMDHTRANS    (),
+                .HTMDHSIZE     (),
+                .HTMDHBURST    (),
+                .HTMDHPROT     (),
+                .HTMDHWDATA    (),
+                .HTMDHWRITE    (),
+                .HTMDHRDATA    (),
+                .HTMDHREADY    (),
+                .HTMDHRESP     (),
+                
+                // Core status
+                .HALTED        (HALTED),     // Halted for debug
+                .LOCKUP        (LOCKUP),     // Core is locked up
+                .BRCHSTAT      (),
+                .SLEEPING      (),
+                .SLEEPDEEP     (),
+                .SLEEPHOLDREQn (1'b1),
+                .SLEEPHOLDACKn (),
+                .ETMINTNUM     (),           // Current active interrupt
+                .ETMINTSTAT    (),           // Interrupt activation status
+                .CURRPRI       (),           // Current interrupt priority
+                
+                // ICODE AHB-lite bus
+                .IFLUSH        (1'b0),       // Force icode flush?
+                .HREADYI       (hreadyi),
+                .HRDATAI       (hrdatai),
+                .HRESPI        (hrespi),
+                .HTRANSI       (htransi),
+                .HSIZEI        (hsizei),
+                .HADDRI        (haddri),
+                .HBURSTI       (hbursti),
+                .HPROTI        (hproti),
+                .MEMATTRI      (memattri),
+                
+                // DCODE AHB-lite bus
+                .HMASTERD      (hmasterd),
+                .HREADYD       (hreadyd),
+                .HRDATAD       (hrdatad),
+                .HRESPD        (hrespd),
+                .HTRANSD       (htransd),
+                .HSIZED        (hsized),
+                .HADDRD        (haddrd),
+                .HBURSTD       (hburstd),
+                .HPROTD        (hprotd),
+                .HWRITED       (hwrited),
+                .HWDATAD       (hwdatad),
+                .MEMATTRD      (memattrd),
+                .EXREQD        (exreqd),
+                .EXRESPD       (exrespd),
                   
-                      // System AHB-lite bus
-                      .HREADYS       (sys_HREADY),
-                      .HRDATAS       (sys_HRDATA),
-                      .HRESPS        ({1'b0, sys_HRESP}),
-                      .HTRANSS       (sys_HTRANS),
-                      .HSIZES        (sys_HSIZE),
-                      .HADDRS        (sys_HADDR),
-                      .HBURSTS       (sys_HBURST),
-                      .HPROTS        (sys_HPROT),
-                      .HWRITES       (hwrites),
-                      .HWDATAS       (sys_HWDATA),
-                      .HMASTLOCKS    (sys_HMASTLOCK),
-                      .HMASTERS      (hmasters),
-                      .MEMATTRS      (memattrs),
-                      .EXREQS        (exreqs),
-                      .EXRESPS       (exresps)                  
-                      );
-
+                // System AHB-lite bus
+                .HREADYS       (sys_HREADY),
+                .HRDATAS       (sys_HRDATA),
+                .HRESPS        ({1'b0, sys_HRESP}),
+                .HTRANSS       (sys_HTRANS),
+                .HSIZES        (sys_HSIZE),
+                .HADDRS        (sys_HADDR),
+                .HBURSTS       (sys_HBURST),
+                .HPROTS        (sys_HPROT),
+                .HWRITES       (hwrites),
+                .HWDATAS       (sys_HWDATA),
+                .HMASTLOCKS    (sys_HMASTLOCK),
+                .HMASTERS      (hmasters),
+                .MEMATTRS      (memattrs),
+                .EXREQS        (exreqs),
+                .EXRESPS       (exresps)                  
+                );
+         
       end
       else begin : gen_cm3
          
          // Instantiate obsfucated core
          CORTEXM3INTEGRATIONDS
-           u_cm3_obs (
-                      // Clocks
-                      .FCLK        (FCLK),
-                      .HCLK        (HCLK),
-                      .TRACECLKIN  (HCLK),
-                      .STCLK       (1'b1), // Not actual clock
-                      
-                      // Reset
-                      .PORESETn    (PORESETn),
-                      .SYSRESETn   (CPURESETn),
-                      .SYSRESETREQ (SYSRESETREQ),
-                      
-                      // Interrupts
-                      .INTISR      ({224'h0, INTISR[15:0]}), // Only 16 interrupts supported on this model
-                      .INTNMI      (INTNMI),
-                      .AUXFAULT    (32'h0),
-                      
-                      // Debug
-                      .SWCLKTCK    (SWCLKTCK),
-                      .nTRST       (nTRST),
-                      .SWDITMS     (SWDITMS),
-                      .TDI         (TDI),
-                      .TDO         (TDO),
-                      .nTDOEN      (nTDOEN),
-                      .SWV         (SWV),
-                      .SWDO        (SWDO),
-                      .SWDOEN      (SWDOEN),
-                      .JTAGNSW     (JTAGNSW),
-                      
-                      // Power management
-                      .CDBGPWRUPREQ (cdbgpwrup),
-                      .CDBGPWRUPACK (cdbgpwrup),
-                      .EDBGRQ       (1'b0),      // What is this?
-                      .DBGRESTART   (1'b0),      // Multiproc debug support?
-                      .DBGRESTARTED (),
-                      .ISOLATEn     (1'b1),      // Isolate core power domain
-                      .RETAINn      (1'b1),      // Retain state in power down
-                      
-                      // Wakeup controller
-                      .WICENREQ     (1'b0),      // Wakeup req from PMIC?
-                      .WICENACK     (),
-                      .WAKEUP       (),
-                      
-                      // Clock gating/bypass
-                      .CGBYPASS     (1'b0),
-                      .RSTBYPASS    (1'b0),
-                      .GATEHCLK     (),
-                      
-                      // Miscellaneous
-                      .SE            (1'b0),     // Scan enable?
-                      .BIGEND        (1'b0),     // Always little endian
-                      .STCALIB       (26'h0),    // Systick calib
-                      .FIXMASTERTYPE (1'b1),     // Needs to be 1
-                      .TSVALUEB      (48'h0),    // TPIU timestamp
-                      .DNOTITRANS    (1'b1),     // Enable code mux
-                      .MPUDISABLE    (1'b0),
-                      .DBGEN         (1'b1),
-                      .NIDEN         (1'b1),     // Non-invasive debug
-                      .TXEV          (),         // TX event output
-                      .RXEV          (1'b0),     // RX event input
-                      
-                      // Traceport - unused
-                      .TRACEDATA     (),
-                      .TRCENA        (),
-                      .TRACECLK      (),
-                      
-                      // HTM data - Not used
-                      .HTMDHADDR     (),
-                      .HTMDHTRANS    (),
-                      .HTMDHSIZE     (),
-                      .HTMDHBURST    (),
-                      .HTMDHPROT     (),
-                      .HTMDHWDATA    (),
-                      .HTMDHWRITE    (),
-                      .HTMDHRDATA    (),
-                      .HTMDHREADY    (),
-                      .HTMDHRESP     (),
-            
-                      // Core status
-                      .HALTED        (HALTED),     // Halted for debug
-                      .LOCKUP        (LOCKUP),     // Core is locked up
-                      .BRCHSTAT      (),
-                      .SLEEPING      (),
-                      .SLEEPDEEP     (),
-                      .SLEEPHOLDREQn (1'b1),
-                      .SLEEPHOLDACKn (),
-                      .ETMINTNUM     (),           // Current active interrupt
-                      .ETMINTSTAT    (),           // Interrupt activation status
-                      .CURRPRI       (),           // Current interrupt priority
-
-                      // ICODE AHB-lite bus
-                      .IFLUSH        (1'b0),       // Force icode flush?
-                      .HREADYI       (hreadyi),
-                      .HRDATAI       (hrdatai),
-                      .HRESPI        (hrespi),
-                      .HTRANSI       (htransi),
-                      .HSIZEI        (hsizei),
-                      .HADDRI        (haddri),
-                      .HBURSTI       (hbursti),
-                      .HPROTI        (hproti),
-                      .MEMATTRI      (memattri),
-                      
-                      // DCODE AHB-lite bus
-                      .HMASTERD      (hmasterd),
-                      .HREADYD       (hreadyd),
-                      .HRDATAD       (hrdatad),
-                      .HRESPD        (hrespd),
-                      .HTRANSD       (htransd),
-                      .HSIZED        (hsized),
-                      .HADDRD        (haddrd),
-                      .HBURSTD       (hburstd),
-                      .HPROTD        (hprotd),
-                      .HWRITED       (hwrited),
-                      .HWDATAD       (hwdatad),
-                      .MEMATTRD      (memattrd),
-                      .EXREQD        (exreqd),
-                      .EXRESPD       (exrespd),
+           u_cm3 (
+                  // Clocks
+                  .FCLK        (FCLK),
+                  .HCLK        (HCLK),
+                  .TRACECLKIN  (HCLK),
+                  .STCLK       (1'b1), // Not actual clock
                   
-                      // System AHB-lite bus
-                      .HREADYS       (sys_HREADY),
-                      .HRDATAS       (sys_HRDATA),
-                      .HRESPS        ({1'b0, sys_HRESP}),
-                      .HTRANSS       (sys_HTRANS),
-                      .HSIZES        (sys_HSIZE),
-                      .HADDRS        (sys_HADDR),
-                      .HBURSTS       (sys_HBURST),
-                      .HPROTS        (sys_HPROT),
-                      .HWRITES       (hwrites),
-                      .HWDATAS       (sys_HWDATA),
-                      .HMASTLOCKS    (sys_HMASTLOCK),
-                      .HMASTERS      (hmasters),
-                      .MEMATTRS      (memattrs),
-                      .EXREQS        (exreqs),
-                      .EXRESPS       (exresps)                  
-                      );
+                  // Reset
+                  .PORESETn    (PORESETn),
+                  .SYSRESETn   (CPURESETn),
+                  .SYSRESETREQ (SYSRESETREQ),
+                      
+                  // Interrupts
+                  .INTISR      ({224'h0, INTISR[15:0]}), // Only 16 interrupts supported on this model
+                  .INTNMI      (INTNMI),
+                  .AUXFAULT    (32'h0),
+                  
+                  // Debug
+                  .SWCLKTCK    (SWCLKTCK),
+                  .nTRST       (nTRST),
+                  .SWDITMS     (SWDITMS),
+                  .TDI         (TDI),
+                  .TDO         (TDO),
+                  .nTDOEN      (nTDOEN),
+                  .SWV         (SWV),
+                  .SWDO        (SWDO),
+                  .SWDOEN      (SWDOEN),
+                  .JTAGNSW     (JTAGNSW),
+                  
+                  // Power management
+                  .CDBGPWRUPREQ (cdbgpwrup),
+                  .CDBGPWRUPACK (cdbgpwrup),
+                  .EDBGRQ       (1'b0),      // What is this?
+                  .DBGRESTART   (1'b0),      // Multiproc debug support?
+                  .DBGRESTARTED (),
+                  .ISOLATEn     (1'b1),      // Isolate core power domain
+                  .RETAINn      (1'b1),      // Retain state in power down
+                  
+                  // Wakeup controller
+                  .WICENREQ     (1'b0),      // Wakeup req from PMIC?
+                  .WICENACK     (),
+                  .WAKEUP       (),
+                  
+                  // Clock gating/bypass
+                  .CGBYPASS     (1'b0),
+                  .RSTBYPASS    (1'b0),
+                  .GATEHCLK     (),
+                  
+                  // Miscellaneous
+                  .SE            (1'b0),     // Scan enable?
+                  .BIGEND        (1'b0),     // Always little endian
+                  .STCALIB       (26'h0),    // Systick calib
+                  .FIXMASTERTYPE (1'b1),     // Needs to be 1
+                  .TSVALUEB      (48'h0),    // TPIU timestamp
+                  .DNOTITRANS    (1'b1),     // Enable code mux
+                  .MPUDISABLE    (1'b0),
+                  .DBGEN         (1'b1),
+                  .NIDEN         (1'b1),     // Non-invasive debug
+                  .TXEV          (),         // TX event output
+                  .RXEV          (1'b0),     // RX event input
+                  
+                  // Traceport - unused
+                  .TRACEDATA     (),
+                  .TRCENA        (),
+                  .TRACECLK      (),
+                      
+                  // HTM data - Not used
+                  .HTMDHADDR     (),
+                  .HTMDHTRANS    (),
+                  .HTMDHSIZE     (),
+                  .HTMDHBURST    (),
+                  .HTMDHPROT     (),
+                  .HTMDHWDATA    (),
+                  .HTMDHWRITE    (),
+                  .HTMDHRDATA    (),
+                  .HTMDHREADY    (),
+                  .HTMDHRESP     (),
+            
+                  // Core status
+                  .HALTED        (HALTED),     // Halted for debug
+                  .LOCKUP        (LOCKUP),     // Core is locked up
+                  .BRCHSTAT      (),
+                  .SLEEPING      (),
+                  .SLEEPDEEP     (),
+                  .SLEEPHOLDREQn (1'b1),
+                  .SLEEPHOLDACKn (),
+                  .ETMINTNUM     (),           // Current active interrupt
+                  .ETMINTSTAT    (),           // Interrupt activation status
+                  .CURRPRI       (),           // Current interrupt priority
+                  
+                  // ICODE AHB-lite bus
+                  .IFLUSH        (1'b0),       // Force icode flush?
+                  .HREADYI       (hreadyi),
+                  .HRDATAI       (hrdatai),
+                  .HRESPI        (hrespi),
+                  .HTRANSI       (htransi),
+                  .HSIZEI        (hsizei),
+                  .HADDRI        (haddri),
+                  .HBURSTI       (hbursti),
+                  .HPROTI        (hproti),
+                  .MEMATTRI      (memattri),
+                  
+                  // DCODE AHB-lite bus
+                  .HMASTERD      (hmasterd),
+                  .HREADYD       (hreadyd),
+                  .HRDATAD       (hrdatad),
+                  .HRESPD        (hrespd),
+                  .HTRANSD       (htransd),
+                  .HSIZED        (hsized),
+                  .HADDRD        (haddrd),
+                  .HBURSTD       (hburstd),
+                  .HPROTD        (hprotd),
+                  .HWRITED       (hwrited),
+                  .HWDATAD       (hwdatad),
+                  .MEMATTRD      (memattrd),
+                  .EXREQD        (exreqd),
+                  .EXRESPD       (exrespd),
+                  
+                  // System AHB-lite bus
+                  .HREADYS       (sys_HREADY),
+                  .HRDATAS       (sys_HRDATA),
+                  .HRESPS        ({1'b0, sys_HRESP}),
+                  .HTRANSS       (sys_HTRANS),
+                  .HSIZES        (sys_HSIZE),
+                  .HADDRS        (sys_HADDR),
+                  .HBURSTS       (sys_HBURST),
+                  .HPROTS        (sys_HPROT),
+                  .HWRITES       (hwrites),
+                  .HWDATAS       (sys_HWDATA),
+                  .HMASTLOCKS    (sys_HMASTLOCK),
+                  .HMASTERS      (hmasters),
+                  .MEMATTRS      (memattrs),
+                  .EXREQS        (exreqs),
+                  .EXRESPS       (exresps)                  
+                  );
       end // gen_cm3
    endgenerate
    

@@ -1,6 +1,5 @@
 CAPI=2:
 name: ::cm3_core:1.0
-description: Cortex-M3 core wrapper
 
 filesets:
     rtl:
@@ -11,6 +10,13 @@ filesets:
             - rtl/cm3_excl_mon.sv
         file_type : verilogSource
 
+    constraints:
+        files:
+            - "tool_vivado? (constraints/cm3.sdc)" : {file_type : SDC}
+            - "tool_vivado? (vivado/cm3.tcl)" : {file_type : tclSource}
+            
 targets:
     default:
-        filesets : [rtl]
+        filesets: [rtl, constraints]
+        description: ARM Cortex-M3 core wrapper
+        
