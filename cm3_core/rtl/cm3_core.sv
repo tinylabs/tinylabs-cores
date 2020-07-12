@@ -20,7 +20,7 @@ module cm3_core #(
    (
     // Clock and reset
     input               FCLK, // Free running clock
-    (* dont_touch="true" *) input HCLK, // System clock
+    input               HCLK, // System clock
     input               PORESETn, // Reset everything (including debug)
     input               CPURESETn, // Reset processor
     output              SYSRESETREQ, // System reset request
@@ -30,7 +30,7 @@ module cm3_core #(
     input               INTNMI, // Non-maskable IRQ
 
     // JTAG/SWD
-    (* dont_touch="true" *) input SWCKTCK, // JTAG CLK/SWDCLK
+    input               SWCKTCK, // JTAG CLK/SWDCLK
     input               SWDITMS, // JTAG TMS/SWDIN
     output logic        SWDO, // SWDOUT
     output logic        SWDOEN, // SWDIO output enable
@@ -113,6 +113,12 @@ module cm3_core #(
    // Loopback power request
    wire                 cdbgpwrup;
 
+   // For constraints
+   (* dont_touch = "yes" *) wire cm3_sys;
+   (* dont_touch = "yes" *) wire cm3_dbg;
+   assign cm3_sys = HCLK;
+   assign cm3_dbg = SWCKTCK;
+   
    // Create exclusive access monitor for sys bus
    cm3_excl_mon
      u_sys_mon (

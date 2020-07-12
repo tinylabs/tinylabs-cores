@@ -6,14 +6,14 @@
 set_false_path -from [get_ports *RESET* ]
 
 # Get clocks
-set cm3_sys [get_property NAME [get_clocks -of [get_nets -hierarchical FCLK ]]]
-set cm3_dbg [get_property NAME [get_clocks -of [get_nets -hierarchical SWCKTCK ]]]
+set cm3_sys [get_property NAME [get_clocks -of [get_nets -hierarchical cm3_sys ]]]
+set cm3_dbg [get_property NAME [get_clocks -of [get_nets -hierarchical cm3_dbg ]]]
 
 # Set JTAG clock as asynchronous
 set_clock_groups -asynchronous -group $cm3_dbg -group $cm3_sys
 
 # Get JTAG Period
-set jtag_period [get_property PERIOD [get_clocks -of [get_nets -hierarchical SWCKTCK ]]]
+set jtag_period [get_property PERIOD [get_clocks -of [get_nets -hierarchical cm3_dbg ]]]
 
 #
 # BELOW is taken from m3_for_arty_a7 contraints... No idea how it is calculated

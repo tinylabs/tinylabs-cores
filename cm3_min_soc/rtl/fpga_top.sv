@@ -61,11 +61,11 @@ module fpga_top
       end // block: gen_pll
       else begin : gen_pll
 
-         // Obsfucated CM3 core can only support 30MHz HCLK
+         // Obsfucated CM3 core can only support 32MHz HCLK
          PLLE2_BASE #(
                       .BANDWIDTH ("OPTIMIZED"),
-                      .CLKFBOUT_MULT (12),
-                      .CLKOUT0_DIVIDE(40),    // 30MHz
+                      .CLKFBOUT_MULT (16),
+                      .CLKOUT0_DIVIDE(50),    // 32MHz
                       .CLKFBOUT_PHASE(0.0),   // Phase offset in degrees of CLKFB, (-360-360)
                       .CLKIN1_PERIOD(10.0),   // 100MHz input clock
                       .CLKOUT0_DUTY_CYCLE(0.5),
