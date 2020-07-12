@@ -34,8 +34,8 @@ module fpga_top
          // Full CM3 core PLL timing
          PLLE2_BASE #(
                       .BANDWIDTH ("OPTIMIZED"),
-                      .CLKFBOUT_MULT (9),
-                      .CLKOUT0_DIVIDE(20),    // 45MHz
+                      .CLKFBOUT_MULT (10),
+                      .CLKOUT0_DIVIDE(20),    // 50MHz
                       .CLKFBOUT_PHASE(0.0),   // Phase offset in degrees of CLKFB, (-360-360)
                       .CLKIN1_PERIOD(10.0),   // 100MHz input clock
                       .CLKOUT0_DUTY_CYCLE(0.5),
