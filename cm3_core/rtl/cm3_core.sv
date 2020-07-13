@@ -117,7 +117,7 @@ module cm3_core #(
    (* dont_touch = "yes" *) wire cm3_sys;
    (* dont_touch = "yes" *) wire cm3_dbg;
    assign cm3_sys = HCLK;
-   assign cm3_dbg = SWCKTCK;
+   assign cm3_dbg = SWCLKTCK;
    
    // Create exclusive access monitor for sys bus
    cm3_excl_mon
