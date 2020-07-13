@@ -30,7 +30,7 @@ module cm3_core #(
     input               INTNMI, // Non-maskable IRQ
 
     // JTAG/SWD
-    input               SWCKTCK, // JTAG CLK/SWDCLK
+    input               SWCLKTCK, // JTAG CLK/SWDCLK
     input               SWDITMS, // JTAG TMS/SWDIN
     output logic        SWDO, // SWDOUT
     output logic        SWDOEN, // SWDIO output enable
@@ -205,7 +205,7 @@ module cm3_core #(
                 .AUXFAULT    (32'h0),
                 
                 // Debug
-                .SWCLKTCK    (SWCKTCK),
+                .SWCLKTCK    (SWCLKTCK),
                 .nTRST       (nTRST),
                 .SWDITMS     (SWDITMS),
                 .TDI         (TDI),

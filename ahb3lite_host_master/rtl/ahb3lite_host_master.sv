@@ -145,25 +145,25 @@ module ahb3lite_host_master
                  //   10=word
                  //
                  case (cmd[3:2])
-                   4'00: /* Read no autoincrement */
+                   2'b00: /* Read no autoincrement */
                      begin
                         HWRITE <= 0;
                         HADDR  <= dati[31:0];
                         addr   <= dati[31:0];
                      end
-                   4'01: /* Read w/ autoincrement*/
+                   2'b01: /* Read w/ autoincrement*/
                      begin
                         HWRITE <= 0;
                         HADDR  <= addr + (1 << cmd[1:0]);
                         addr   <= addr + (1 << cmd[1:0]);
                      end
-                   4'10: /* Write no autoincrement */
+                   2'b10: /* Write no autoincrement */
                      begin
                         HWRITE <= 1;
                         HADDR  <= data[63:32];
                         addr   <= dati[63:32];
                      end
-                   4'11: /* Write w/ autoincrement*/
+                   2'b11: /* Write w/ autoincrement*/
                      begin
                         HWRITE <= 1;
                         HADDR  <= addr + (1 << cmd[1:0]);
@@ -227,8 +227,8 @@ module ahb3lite_host_master
                       // Move to response state
                       state <= IDLE;
                    end
-              end
-              
+              end // case: DATA
+          endcase // case (state)
        end /* !RESETn */
    
 endmodule // ahb3lite_host_master
