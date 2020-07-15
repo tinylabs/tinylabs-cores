@@ -42,6 +42,7 @@ module ahb3lite_host_master
    typedef enum logic [1:0] {
                              IDLE = 0, // Waiting for cmd
                              ADDR,     // ADDR phase
+                             WAIT,     // Wait one cycle
                              DATA      // DATA phase
                              } state_t;
 
@@ -50,8 +51,9 @@ module ahb3lite_host_master
    localparam OWIDTH = 40;
    
    // Buffer for command and data
+   logic [31:0]                   addr;   // Save address for autoincrement
    logic [7:0]                    cmd;    // Command to execute
-   logic [$clog2(IWIDTH/8)-1:0]   icnt;   // Data in count
+   logic [FIFO_PAYLOAD_WIDTH-1:0] icnt;   // Data in count
    logic [$clog2(OWIDTH/8)-1:0]   ocnt;   // Data out count
    logic [IWIDTH-1:0]             dati;   // Data in
    logic [OWIDTH-1:0]             dato;   // Data out
@@ -64,16 +66,16 @@ module ahb3lite_host_master
    
    // Always read when not busy and data is available
    assign RDEN = ~busy & ~RDEMPTY;
-   
+
    always @(posedge CLK)
      if (!RESETn)
        begin
           dvalid <= 0;
-          busy <= 0;
           cmd <= 0;
           icnt <= 0;
           state <= IDLE;
           HTRANS <= HTRANS_IDLE;
+          addr <= 0;
        end
      else
        begin
@@ -94,39 +96,45 @@ module ahb3lite_host_master
                dato <= {8'h0, dato[OWIDTH-1:8]};
                ocnt <= ocnt - 1;
             end
+          else
+            WREN <= 0;
           
-          //
-          // INCOMING DATA FROM HOST FIFO
-          //
-          if (dvalid)
-            begin
-
-               // First byte is command
-               if (icnt == 0)
-                 begin
-                    // Save command
-                    cmd <= RDDATA;
-
-                    // Decode payload count
-                    icnt <= fifo_payload (RDDATA[6:4]);
-
-                    // If zero byte command added must move state here...
-                 end
-               // Following icnt data is all payload
-               else
-                 begin
-                    // Shift in payload, decrement icnt
-                    dati <= {dati[IWIDTH-8-1:0], RDDATA};
-                    icnt <= icnt - 1;
-
-                    // All data is in make state
-                    if (icnt == 1)
-                      state <= ADDR;                    
-                 end
-            end // if (dvalid)
-
           // State machine
           case (state)
+            IDLE:
+              //
+              // INCOMING DATA FROM HOST FIFO
+              //
+              if (dvalid)
+                begin
+                   
+                   // First byte is command
+                   if (icnt == 0)
+                     begin
+                        // Save command
+                        cmd <= RDDATA;
+                        
+                        // Decode payload count
+                        icnt <= fifo_payload (RDDATA[6:4]);
+
+                        // If zero byte command we must switch states here
+                        if (RDDATA[6:4] == 0)
+                          state <= ADDR;
+                        
+                     end
+                   // Following icnt data is all payload
+                   else
+                     begin
+                        // Shift in payload, decrement icnt
+                        dati <= {dati[IWIDTH-8-1:0], RDDATA};
+                        icnt <= icnt - 1;
+                        
+                        // All data is in make state
+                        if (icnt == 1)
+                          state <= ADDR;                    
+                     end
+                end // if (dvalid)
+            
             //
             // PROCESS HOST COMMAND
             //
@@ -160,8 +168,11 @@ module ahb3lite_host_master
                    2'b10: /* Write no autoincrement */
                      begin
                         HWRITE <= 1;
-                        HADDR  <= data[63:32];
-                        addr   <= dati[63:32];
+                        casez (cmd[1:0])
+                          2'b00: begin HADDR <= dati[39:8];  addr <= dati[39:8];  end
+                          2'b01: begin HADDR <= dati[47:16]; addr <= dati[47:16]; end
+                          2'b1?: begin HADDR <= dati[63:32]; addr <= dati[63:32]; end
+                        endcase
                      end
                    2'b11: /* Write w/ autoincrement*/
                      begin
@@ -178,56 +189,73 @@ module ahb3lite_host_master
                  HSIZE  <= {1'b0, cmd[1:0]};
                  
                  // Move to data state
-                 state <= DATA;
+                 state <= WAIT;
               end // case: ADDR
 
+            //
+            // Wait for transaction to latch
+            WAIT:
+              begin
+                 // Put data on bus regardless of slave HREADY
+                 // NOTE: We only support aligned access
+                 if (HWRITE)
+                   // Replicate across lanes
+                   casez (cmd[1:0])
+                     2'b00: HWDATA <= {dati[7:0], dati[7:0], dati[7:0], dati[7:0]};
+                     2'b01: HWDATA <= {dati[15:0], dati[15:0]};
+                     2'b1?: HWDATA <= dati[31:0];
+                   endcase
+
+                 // Change bus state to IDLE
+                 HTRANS <= HTRANS_IDLE;
+                 state <= DATA;
+              end
+            
             //
             // DATA state
             //
             DATA:
               begin
-                 // Put data on bus regardless of slave HREADY
-                 // NOTE: We only support aligned access
-                 if (HWRITE)
-                   // Put on correct byte lanes
-                   casez (cmd[1:0])
-                     2'b00: HWDATA <= data[7:0]  << (8 * HADDR[1:0]);
-                     2'b01: HWDATA <= data[15:0] << (8 * {HADDR[1], 1'b0});
-                     2'b1?: HWDATA <= data[31:0];
-                   endcase
                  
                  // Once client is ready check for error
                  // Save data is no error
                  if (HREADY)
                    begin
-                      // Change bus state to IDLE
-                      HTRANS <= HTRANS_IDLE;
                       
                       // Check for error
                       if (HRESP == HRESP_ERROR)
                         begin
                            // Respond with error
-                           dato <= {cmd[7], FIFO_D0, 3'h0, 1'b1};
-                           cnto <= 1;
+                           dato <= {32'h0, cmd[7], FIFO_D0, 3'h0, 1'b1};
+                           ocnt <= 1;
                         end
                       // Read data from bus, send to host
                       else if (~HWRITE)
                         casez (cmd[1:0])
-                          2'b01: begin dato <= {HRDATA[7:0],  {cmd[7], FIFO_D1, 4'h0}}; cnto <= 2; end
-                          2'b10: begin dato <= {HRDATA[15:0], {cmd[7], FIFO_D2, 4'h0}}; cnto <= 3; end
-                          2'b1?: begin dato <= {HRDATA[31:0], {cmd[7], FIFO_D4, 4'h0}}; cnto <= 5; end
+                          2'b00: begin dato <= {HRDATA[31:0] >> (HADDR[1:0] * 8), cmd[7], FIFO_D1, 4'h0}; ocnt <= 2; end
+                          2'b01: begin
+                             if (HADDR[1])
+                               dato <= {16'h0, HRDATA[23:16], HRDATA[31:24], cmd[7], FIFO_D2, 4'h0};
+                             else
+                               dato <= {16'h0, HRDATA[7:0], HRDATA[15:8], cmd[7], FIFO_D2, 4'h0};
+                             ocnt <= 3; 
+                          end
+                          2'b1?: begin dato <= {HRDATA[7:0], HRDATA[15:8], HRDATA[23:16], HRDATA[31:24],
+                                                cmd[7], FIFO_D4, 4'h0}; ocnt <= 5; end
                         endcase // casez (cmd[1:0])
                       else
                         begin
                            // Successful write, return success
-                           dato <= {cmd[7], FIFO_D0, 4'h0};
-                           cnto <= 1;
+                           dato <= {32'h0, cmd[7], FIFO_D0, 4'h0};
+                           ocnt <= 1;
                         end
  
                       // Move to response state
                       state <= IDLE;
                    end
               end // case: DATA
+            default: state <= IDLE;
+              
           endcase // case (state)
        end /* !RESETn */
    

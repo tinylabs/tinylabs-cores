@@ -177,10 +177,10 @@ int VerilatorUtils::parseOpts(int key, char *arg, struct argp_state *state) {
     break;
 
   case 'j':
-      utils->jtagServerEnable = true;
-      if (arg)
-        utils->jtagServerPort = atoi(arg);
-      utils->jtag_server->Start (utils->jtagServerPort);
+    utils->jtagServerEnable = true;
+    if (arg)
+      utils->jtagServerPort = atoi(arg);
+    utils->jtag_server->Start (utils->jtagServerPort);
     break;
 
   case 'u':
