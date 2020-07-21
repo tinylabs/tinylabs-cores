@@ -20,25 +20,37 @@ module ahb3lite_default_slave
 
 import ahb3lite_pkg::*;
 
+   logic               active;
+               
 /* Simple state machine - just return error according to AHB3 spec */
 always @(posedge CLK)
   begin
      if (!RESETn)
        begin
           HREADYOUT <= 1;
-          HRESP <= 0;
+          HRESP <= HRESP_OKAY;
           HRDATA <= 32'h0;
+          active <= 0;
        end
      else
        begin
           if (HREADY & HSEL && (HTRANS != HTRANS_BUSY) && (HTRANS != HTRANS_IDLE))
-            HREADYOUT <= 0;
-          else if (HRESP & HREADYOUT)
-            HRESP <= 0;
-          else if (HRESP)
-            HREADYOUT <= 1;
-          else if (!HREADYOUT)
-            HRESP <= 1;
+            begin
+               HREADYOUT <= 0;
+               active <= 1;
+            end
+          else if (active)
+            begin
+               if (HRESP & HREADYOUT)
+                 begin
+                    HRESP <= 0;
+                    active <= 0;
+                 end
+               else if (HRESP)
+                 HREADYOUT <= 1;
+               else if (!HREADYOUT)
+                 HRESP <= 1;
+            end
        end
   end   
 

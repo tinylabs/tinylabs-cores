@@ -94,7 +94,7 @@ module fifo_arb_tx #(
    //assign cmd = data_valid && (dcnt == 0) ? data : cmd;
    
    // Assign hold signals
-   assign hold = (dcnt == 0) && ((data >> CSHIFT) & CMASK) ? 1 : 0;
+   assign hold = (dcnt == 0) & (((data >> CSHIFT) & CMASK) != 0) ? 1 : 0;
 
    // FIFO selection
    assign c1_sel  = ~fifo_wrfull & (~c2_psel & (~c1_rdempty | (c1_psel & hold) | (c1_psel & (dcnt > 0))));
@@ -126,23 +126,23 @@ module fifo_arb_tx #(
 
              // Assign cnt
              if (data_valid && (dcnt == 0))
-               dcnt <= fifo_payload ((data >> CSHIFT) & CMASK);
+               dcnt <= fifo_payload (FIFO_CNT_WIDTH'((32'(data) >> CSHIFT) & CMASK));
 
              // Data is valid if either enable was asserted last cycle
              if (c1_rden | c2_rden)
-               begin
-                  data_valid <= 1;
-                  if (dcnt)
-                    dcnt <= dcnt - 1;
-               end
+               data_valid <= 1;
              else
                data_valid <= 0;
 
+             // Decrement data count
+             if (data_valid & (dcnt != 0))
+               dcnt <= dcnt - 1;
+
              // Save previous rden
-             c1_prden = c1_rden;
-             c2_prden = c2_rden;
-             c1_psel = c1_sel;
-             c2_psel = c2_sel;
+             c1_prden <= c1_rden;
+             c2_prden <= c2_rden;
+             c1_psel <= c1_sel;
+             c2_psel <= c2_sel;
           end
      end
 endmodule // fifo_arb_rx

@@ -85,17 +85,19 @@ module fifo_arb_rx #(
    logic                          data_valid;
    logic [FIFO_PAYLOAD_WIDTH-1:0] dcnt;
    wire                           sel;
+   logic                          psel;
    wire [DWIDTH-1:0]              cmd;
+   logic [DWIDTH-1:0]             pcmd;
    
    // Mostly combinatorial logic
    assign fifo_rden = ~fifo_rdempty & ~c1_wrfull & ~c2_wrfull;
    assign c1_wrdata = fifo_rddata;
    assign c2_wrdata = fifo_rddata;
-   assign sel = (dcnt != 0) ? sel :
+   assign sel = (dcnt != 0) ? psel :
                 ((cmd & SELMASK) != 0 ? 1 : 0);
    assign c1_wren = data_valid & sel  ? 1'b1 : 1'b0;
    assign c2_wren = data_valid & !sel ? 1'b1 : 1'b0;
-   assign cmd = (dcnt == 0) ? fifo_rddata : cmd;
+   assign cmd = (dcnt == 0) & data_valid ? fifo_rddata : pcmd;
    
    always @(posedge CLK)
      begin
@@ -103,23 +105,30 @@ module fifo_arb_rx #(
           begin
              data_valid <= 0;
              dcnt       <= 0;
+             pcmd       <= 0;
+             psel       <= 0;
           end
         else 
           begin
 
              // Decode count field
              if (data_valid && (dcnt == 0))
-               dcnt <= fifo_payload ((cmd >> CSHIFT) & CMASK);
+               dcnt <= fifo_payload (FIFO_CNT_WIDTH'((32'(cmd) >> CSHIFT) & CMASK));
                    
              // data_valid lags by one cycle
              if (fifo_rden)
-               begin
-                  data_valid <= 1;
-                  if (dcnt)
-                    dcnt <= dcnt - 1;
-               end
+               data_valid <= 1;
              else
                data_valid <= 0;
+
+             // Decrement if data valid
+             if (data_valid & (dcnt != 0))
+                 dcnt <= dcnt - 1;
+
+             // Save to prevent feedback
+             pcmd <= cmd;
+             psel <= sel;
+
           end
      end
 endmodule // fifo_arb_rx

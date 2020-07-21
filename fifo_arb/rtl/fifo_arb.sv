@@ -11,7 +11,7 @@ module fifo_arb #(
                   parameter DW = 8,
                   parameter AW = 3,
                   parameter SELMASK = 8'h80,
-                  parameter CNTMASK = 8'70
+                  parameter CNTMASK = 8'h70
                   )
    (
     // Global connections

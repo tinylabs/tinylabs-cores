@@ -4,9 +4,9 @@ name: ::ahb3lite_host_slave:1.0
 filesets:
     rtl:
         depend:
+            - host_fifo_pkg
             - ahb3lite_pkg
             - ahb3lite_default_slave
-            - fifo_host_pkg
         files:
             - rtl/ahb3lite_host_slave.sv
         file_type : verilogSource

@@ -73,9 +73,12 @@ module ahb3lite_host_master
           dvalid <= 0;
           cmd <= 0;
           icnt <= 0;
+          ocnt <= 0;
           state <= IDLE;
           HTRANS <= HTRANS_IDLE;
           addr <= 0;
+          dati <= 0;
+          dato <= 0;
        end
      else
        begin

@@ -46,7 +46,7 @@ module ahb3lite_host_slave
    import host_fifo_pkg::*;
    
    // Simple AHB master state machine
-   typedef enum logic [1:0] {
+   typedef enum logic [2:0] {
                              IDLE = 0, // Waiting for cmd
                              WAITDATA, // Wait for data phase
                              WAITRESP, // Wait for host response
@@ -66,15 +66,22 @@ module ahb3lite_host_slave
    logic                          dvalid; // Is fifo data valid
    state_t                        state;  // State machine
    wire                           err;
-
+   wire [31:0]                    sdat;   // Adjusted data based on address
+   logic [1:0]                    size;   // HSIZE for current transaction
+   logic                          write;  // HWRITE for current transaction
+   logic [31:0]                   addr;   // HADDR
+   
    // Point to correct response bit for error
-   assign err = HWRITE ? dati[0] :
-                ((HSIZE[1:0] == 2'b00) ? dati[8] :
-                 ((HSIZE[1:0] == 2'b01) ? dati[16]) : dati[32]);
+   assign err = write ? dati[0] :
+                ((size[1:0] == 2'b00) ? dati[8] :
+                 ((size[1:0] == 2'b01) ? dati[16] : dati[32]));
    
    // Always read when not busy and data is expected
    assign RDEN = ~RDEMPTY && (icnt != 0);
 
+   // Shift data based on address
+   assign sdat = HWDATA >> (8 * addr[1:0]);
+     
    //
    // When host slave is not enabled use default slave to return error
    //
@@ -93,14 +100,14 @@ module ahb3lite_host_slave
    always @(posedge CLK)
      if (!RESETn)
        begin
-          dati <= {0};
-          dato <= {0};
+          dati <= 0;
+          dato <= 0;
           dvalid <= 0;
-          cmd <= 0;
           icnt <= 0;
+          ocnt <= 0;
           state <= IDLE;
-          HRESP <= HRESP_OKAY;
-          HREADYOUT <= 1;
+          //HRESP <= HRESP_OKAY; handled by default slave
+          //HREADYOUT <= 1;
        end
      else if (EN)
        begin
@@ -119,6 +126,8 @@ module ahb3lite_host_slave
                dato <= {8'h0, dato[OWIDTH-1:8]};
                ocnt <= ocnt - 1;               
             end
+          else
+            WREN <= 0;
           
           // Slave state machine
           case (state)
@@ -136,12 +145,17 @@ module ahb3lite_host_slave
                       
                       // Assert busy immediately - we know this will take many cycles
                       HREADYOUT <= 0;
+                      size <= HSIZE[1:0];
+                      write <= HWRITE;
+                      addr <= HADDR;
                       
                       // Send read to host
                       if (~HWRITE)
                         begin
                            // Send read to host
-                           dato <= {HADDR, IBIT, FIFO_D4, HWRITE, 1'b0, HSIZE[1:0]};
+                           dato <= {32'h0, 
+                                    HADDR[7:0], HADDR[15:8], HADDR[23:16], HADDR[31:24],
+                                    IBIT, FIFO_D4, HWRITE, 1'b0, HSIZE[1:0]};
                            ocnt <= 5;
 
                            // Calc exprected response len
@@ -165,20 +179,26 @@ module ahb3lite_host_slave
             // This should always come one cycle after ADDR phase
             WAITDATA:
               begin
-                 casez (HSIZE[1:0])
+                 casez (size[1:0])
                    2'b00: // byte access
                      begin
-                        dato <= {HWDATA >> (8 * HADDR[1:0]), HADDR, IBIT, FIFO_D5, HWRITE, 1'b0, HSIZE};
+                        dato <= {24'h0, sdat[7:0], 
+                                 addr[7:0], addr[15:8], addr[23:16], addr[31:24],
+                                 IBIT, FIFO_D5, write, 1'b0, size[1:0]};
                         ocnt <= 6;
                      end
                    2'b01: // hwrd access
                      begin
-                        dato <= {HWDATA >> (8 * {HADDR[1], 1'b0}), HADDR, IBIT, FIFO_D6, HWRITE, 1'b0, HSIZE};
+                        dato <= {16'h0, sdat[7:0], sdat[15:8], 
+                                 addr[7:0], addr[15:8], addr[23:16], addr[31:24],
+                                 IBIT, FIFO_D6, write, 1'b0, size[1:0]};
                         ocnt <= 7;
                      end
                    2'b1?: // word access
                      begin
-                        dato <= {HWDATA, HADDR, IBIT, FIFO_D8, HWRITE, 1'b0, HSIZE};
+                        dato <= {sdat[7:0], sdat[15:8], sdat[23:16], sdat[31:24],
+                                 addr[7:0], addr[15:8], addr[23:16], addr[31:24],
+                                 IBIT, FIFO_D8, write, 1'b0, size[1:0]};
                         ocnt <= 9;
                      end
                  endcase
@@ -196,10 +216,10 @@ module ahb3lite_host_slave
               begin
                  if (dvalid)
                    begin
-                      dati <= {dati[IWIDTH-8-1:8], RDDATA};
+                      dati <= {dati[IWIDTH-8-1:0], RDDATA};
                       if (icnt == 1)
                         state <= AHBRESP;
-                      if (icnt)
+                      if (icnt != 0)
                         icnt <= icnt - 1;
                    end
               end
@@ -219,12 +239,12 @@ module ahb3lite_host_slave
                    begin
 
                       // If read then move to bus
-                      if (~HWRITE)
-                        casez (HSIZE[1:0])
-                          2'b00: HRDATA <= dati[7:0] << HADDR[1:0];
-                          2'b01: HRDATA <= dati[15:0] << {HADDR[1], 1'b0};
+                      if (~write)
+                        casez (size[1:0])
+                          2'b00: HRDATA <= {dati[7:0], dati[7:0], dati[7:0], dati[7:0]};
+                          2'b01: HRDATA <= {dati[15:0], dati[15:0]};
                           2'b1?: HRDATA <= dati[31:0];
-                        endcase // casez (HSIZE[1:0])
+                        endcase // casez (size[1:0])
                       
                       // Write OKAY
                       HRESP <= HRESP_OKAY;
@@ -245,6 +265,10 @@ module ahb3lite_host_slave
                  HREADYOUT <= 1;
                  state <= IDLE;
               end
+
+            // Just to be safe
+            default:
+              state <= IDLE;
             
           endcase // case (state)          
        end // if (EN)
