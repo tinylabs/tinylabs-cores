@@ -70,41 +70,34 @@ module ahb3lite_csr
 
    always @(posedge CLK)
      begin
-
         if (~RESETn)
-          begin
-             // Initialize with REGIN on reset
-             for (int n = 0; n < CNT; n++)
-               REGOUT[n] <= REGIN[n];
-          end
-        // Only operate when RESET is not asserted
+          // Allow initialization during reset
+          for (int n = 0; n < CNT; n++)
+            REGOUT[n] <= REGIN[n];
         else
           begin
 
-             // Switch on access mode
-             case (ACCESS[sel])
-               2'b00: begin // RW
-                  if (we &  (sel < CNT))
-                    REGOUT[sel] <= wval (REGOUT[sel], HWDATA, be);
-                  else
-                    HRDATA <= (sel < CNT) ? REGIN[sel] : 32'hdeadbeef;
-               end
-               2'b01: begin // RO
-                  HRDATA <= (sel < CNT) ? REGIN[sel] : 32'hdeadbeef;
-               end
-               2'b10: begin // WO
-                  if (we &  (sel < CNT))
-                    REGOUT[sel] <= wval (REGOUT[sel], HWDATA, be);                  
-                  else
-                    HRDATA <= (sel < CNT) ? 32'h0 : 32'hdeadbeef;
-               end
-               2'b11: begin // W1C
-                  if (we &  (sel < CNT))
-                    REGOUT[sel] <= REGOUT[sel] & wval (REGOUT[sel], ~HWDATA, be);
-                  else
-                    HRDATA <= (sel < CNT) ? REGIN[sel] : 32'hdeadbeef;                  
-               end
-             endcase // case (ACCESS[sel])
+             // Handle AHB writes
+             if (we & (sel < CNT))
+               
+               // Switch on access mode
+               case (ACCESS[sel])
+                 2'b00: REGOUT[sel] <= wval (REGOUT[sel], HWDATA, be);
+                 2'b01: ; // RO - do nothing
+                 2'b10: REGOUT[sel] <= wval (REGOUT[sel], HWDATA, be);                  
+                 2'b11: REGOUT[sel] <= REGOUT[sel] & wval (REGOUT[sel], ~HWDATA, be);
+               endcase // case (ACCESS[sel])
+
+             // Output = input unless WO or being accessed on bus
+             for (int n = 0; n < CNT; n++)
+               if ((ACCESS[n] != 2'b10) & ~((n == 32'(sel)) & we))
+                 REGOUT[n] <= REGIN[n];
+                   
+             // Handle read
+             if (ACCESS[sel] == 2'b10) // Write only
+               HRDATA <= 32'h0;
+             else
+               HRDATA <= (sel < CNT) ? REGIN[sel] : 32'hdeadbeef;                  
              
           end // if (RESETn)
      end // always @ (posedge CLK)

@@ -1,0 +1,34 @@
+CAPI=2:
+name: ::ahb3lite_irq_slave:0.1
+
+filesets:
+    rtl:
+        files:
+            - rtl/ahb3lite_irq_slave.sv
+        file_type : verilogSource
+
+    irq_slave_dep:
+        depend:
+            - ahb3lite_csr
+
+generate:
+    irq_slave:
+        generator: ahb3lite_csr_gen
+        parameters:
+            instance:
+            registers:
+                edge:
+                    width: 32
+                    type:  rw
+                    count: 8
+                level:
+                    width: 32
+                    type:  rw
+                    count: 8
+
+targets:
+    default:
+        filesets : [irq_slave_dep, rtl]
+        generate: [irq_slave]
+        description: AHB3 slave to generate IRQs
+

@@ -103,11 +103,11 @@ class CSRGen:
 
         # Generate name
         self.name = re.split(r'[-:]+', self.vlnv)[2]
-        if 'address' not in config.keys ():
-            raise ValueError ("key address not found!")
-        else:
-            self.address = config['address']
-            print (self.name, "@", hex(self.address))
+        #if 'address' not in config.keys ():
+        #    raise ValueError ("key address not found!")
+        #else:
+        #    self.address = config['address']
+        #    print (self.name, "@", hex(self.address))
 
         # Get instance
         if 'instance' not in config.keys ():
@@ -194,9 +194,15 @@ class CSRGen:
         params = [Parameter ('CNT', len (self.reg))]
         ports = [Port ('CLK', 'CLK'),
                  Port ('RESETn', 'RESETn')]
-        ports += [Port (p.name, self.instance + '_' + p.name) for p in AHB3_MASTER_PORTS]
-        ports += [Port (p.name, self.instance + '_' + p.name) for p in AHB3_SLAVE_PORTS]
-
+        if self.instance:
+            ports += [Port (p.name, self.instance + '_' + p.name) for p in AHB3_MASTER_PORTS]
+        else:
+            ports += [Port (p.name, p.name) for p in AHB3_MASTER_PORTS]
+        if self.instance:
+            ports += [Port (p.name, self.instance + '_' + p.name) for p in AHB3_SLAVE_PORTS]
+        else:
+            ports += [Port (p.name, p.name) for p in AHB3_SLAVE_PORTS]
+            
         # Ports only applicable to IP instantiation
         # Add access bits
         access = '';
