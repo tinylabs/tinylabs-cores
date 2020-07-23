@@ -39,12 +39,13 @@ module ahb3lite_irq_slave
 
    // Maintain IRQ
    for (genvar n = 0; n < IRQ_CNT / 32; n++)
-     assign IRQ[n+31:n] = level_o | edge_o;
+     begin
+        assign IRQ[n+31:n] = level_o[n] | edge_o[n];
 
-   // Maintain level over time
-   assign level_i = level_o;
-   assign edge_i = 32'h0;
-   
+        // Maintain level over time
+        assign level_i[n] = level_o[n];
+        assign edge_i[n] = 32'h0;
+     end
 endmodule // ahb3lite_irq_slave
 
      

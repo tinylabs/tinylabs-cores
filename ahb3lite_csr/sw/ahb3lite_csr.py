@@ -35,11 +35,12 @@ class Port:
         self.value = value
         
 class Field:
-    def __init__(self, name, offset, d=None):
+    def __init__(self, name, d=None):
         self.name = name
-        self.offset = offset
         self.width = 32
+        self.rptr = []
         self.rtype = 'rw'
+        self.count = 1
         for k, v in d.items ():
             if k == 'width':
                 self.width = v;
@@ -49,21 +50,20 @@ class Field:
                 if (v != 'ro') and (v != 'rw') and (v != 'wo') and (v != 'w1c'):
                     raise ValueError ("Invalid type:"+v+" valid types: ro,rw,wo,w1c")
                 self.rtype = v
+            elif k == 'count':
+                self.count = int (v)
             else:
                 raise ValueError ("Unknown prop %s" % v)
-    def __str__(self):
-        if self.offset:
-            s = '\t'
+    def n(self, n):
+        if self.count == 1:
+            return '\t' + self.name + ':' + str(self.rptr[0].offset) + ':' + str (self.width)
         else:
-            s = ''
-        s += hex (self.offset) + ': ' + self.name + ':' + str(self.width)
-        return s
+            return '\t' + self.name + '[' + str(n) + ']:' + str(self.rptr[n].offset) + ':' + str (self.width)
     
 class Reg:
-    def __init__(self, rtype, offset):
-        self.field = []
+    def __init__(self, rtype, address):
         self.rtype = rtype
-        self.offset = offset
+        self.address = address
         if self.rtype == 'rw':
             self.access = '2\'b00';
         elif self.rtype == 'ro':
@@ -74,14 +74,19 @@ class Reg:
             self.access = '2\'b11';
 
     def __str__(self):
-        s = hex(self.offset) + ':(' + self.rtype + ')'
-        for f in self.field:
-            s += '\t' + str(f) + '\n'
-        return s.rstrip()
+        return self.rtype + ':' + '0x{:04x}'.format(self.address) + ':'
+
+class RegPtr:
+    def __init__(self, reg, offset):
+        self.reg = reg
+        self.offset = offset
+    def __str__(self):
+        return str (self.reg) + ' ' + str(self.offset)
     
 class CSRGen:
     def __init__(self, config_file):
         d = OrderedDict()
+        self.field = []
         self.reg = []
         import yaml
 
@@ -128,24 +133,42 @@ class CSRGen:
         addr = 0
         for k,v in regs:
 
-            # Create new register if no more space or fields have changed
-            if v['type'] != rtype or (off + v['width']) >= 32:
-                r = Reg (v['type'], addr)
-                self.reg.append(r)
-                off = 0
-                addr += 4
-                rtype = v['type']
-                
             # Add field
-            r.field.append (Field (k, off, v))
-            off += v['width']
+            f = Field (k, v)
+
+            # Loop over each count in field
+            for n in range (f.count):
+
+                # Create new register if no more space or fields have changed
+                if v['type'] != rtype or (off + v['width']) > 32:
+                    r = Reg (v['type'], addr)
+                    off = 0
+                    addr += 4
+                    rtype = v['type']
+                    self.reg.append (r)
+
+                # Save register pointer
+                f.rptr.append (RegPtr (r, off))
+                
+                # Update width
+                off += v['width']
+                            
+            # Add field
+            self.field.append (f)
 
         # Dump registers
         self.dump ()
         
     def dump(self):
-        for r in self.reg:
-            print (r)
+        addr = -1
+        for f in self.field:
+            for n in range (f.count):
+                if f.rptr[n].reg.address != addr:
+                    print (f.rptr[n].reg, end='')
+                    addr = f.rptr[n].reg.address
+                else:
+                    print ('\t', end='')
+                print (f.n(n))
 
     def write(self):
         file = self.name + '.sv'
@@ -155,34 +178,62 @@ class CSRGen:
         self.verilog_writer.add (Wire ('csro', len (self.reg), prepend='[31:0]'))
 
         # Assign wiring to registers
-        for r in self.reg:
-            for f in r.field:
-                if r.rtype == 'rw' or r.rtype == 'w1c':
-                    self.verilog_writer.add (Assign ('csri['+str((int(r.offset/4)))+']['+
-                                                     str(f.width+f.offset-1)+':'+str(f.offset)+']', f.name + '_i'))
-                    self.verilog_writer.add (Assign (f.name + '_o', 'csro['+str((int(r.offset/4)))+']['+
-                                                     str(f.width+f.offset-1)+':'+str(f.offset)+']'))
-                elif r.rtype == 'ro':
-                    self.verilog_writer.add (Assign ('csri['+str((int(r.offset/4)))+']['+
-                                                     str(f.width+f.offset-1)+':'+str(f.offset)+']', f.name))
-                elif r.rtype == 'wo':
-                    self.verilog_writer.add (Assign (f.name, 'csro['+str((int(r.offset/4)))+']['+
-                                                     str(f.width+f.offset-1)+':'+str(f.offset)+']'))
+        for f in self.field:
+            for n in range (f.count):
+                rptr = f.rptr[n]
+                if f.rtype == 'rw' or f.rtype == 'w1c':
+                    if f.count == 1:
+                        self.verilog_writer.add (Assign ('csri[' + str(int(rptr.reg.address/4)) + '][' +
+                                                         str(f.width+rptr.offset-1) + ':' + str(rptr.offset) + ']',
+                                                         f.name + '_i'))
+                        self.verilog_writer.add (Assign (f.name + '_o', 'csro[' + str(int(rptr.reg.address/4)) +
+                                                         '][' + str(f.width+rptr.offset-1) + ':' + str(rptr.offset) + ']'))
+                    else:
+                        self.verilog_writer.add (Assign ('csri[' + str(int(rptr.reg.address/4)) + '][' +
+                                                         str(f.width+rptr.offset-1) + ':' + str(rptr.offset) + ']',
+                                                         f.name + '_i[' + str(n) + ']'))
+                        self.verilog_writer.add (Assign (f.name + '_o[' + str(n) + ']', 'csro[' +
+                                                         str(int(rptr.reg.address/4)) + '][' +
+                                                         str(f.width+rptr.offset-1) + ':' + str(rptr.offset) + ']'))
+
+
+                elif f.rtype == 'ro':
+                    if f.count == 1:
+                        self.verilog_writer.add (Assign ('csri[' + str(int(rptr.reg.address/4)) + '][' +
+                                                         str(f.width+rptr.offset-1) + ':' + str(rptr.offset) + ']',
+                                                         f.name))
+                    else:
+                        self.verilog_writer.add (Assign ('csri[' + str(int(rptr.reg.address/4)) + '][' +
+                                                         str(f.width+rptr.offset-1) + ':' + str(rptr.offset) + ']',
+                                                         f.name + '[' + str(n) + ']'))
+                            
+                elif f.rtype == 'wo':
+                    if f.count == 1:
+                        self.verilog_writer.add (Assign (f.name, 'csro[' +
+                                                         str(int(rptr.reg.address/4)) + '][' +
+                                                         str(f.width+rptr.offset-1) + ':' + str(rptr.offset) + ']'))
+                    else:
+                        self.verilog_writer.add (Assign (f.name + '[' + str(n) + ']', 'csro[' +
+                                                         str(int(rptr.reg.address/4)) + '][' +
+                                                         str(f.width+rptr.offset-1) + ':' + str(rptr.offset) + ']'))
 
         # Create module
         self.verilog_writer.add(ModulePort('CLK', 'input'))
         self.verilog_writer.add(ModulePort('RESETn', 'input'))
 
         # Add all signals to module
-        for r in self.reg:
-            for f in r.field:
-                if r.rtype == 'rw' or r.rtype == 'w1c':
+        for f in self.field:
+            if f.rtype == 'rw' or f.rtype == 'w1c':
+                if (f.count == 1):
                     self.verilog_writer.add (ModulePort (f.name + '_i', 'input', f.width))
                     self.verilog_writer.add (ModulePort (f.name + '_o', 'output', f.width))
-                elif r.rtype == 'ro':
-                    self.verilog_writer.add (ModulePort (f.name, 'input', f.width))
-                elif r.rtype == 'wo':
-                    self.verilog_writer.add (ModulePort (f.name, 'output', f.width))
+                else:
+                    self.verilog_writer.add (ModulePort ('[' + str(f.width - 1) + ':0] ' + f.name + '_i ', 'input', f.count))
+                    self.verilog_writer.add (ModulePort ('[' + str(f.width - 1) + ':0] ' + f.name + '_o ', 'output', f.count))
+            elif f.rtype == 'ro':
+                self.verilog_writer.add (ModulePort (f.name, 'input', f.width))
+            elif f.rtype == 'wo':
+                self.verilog_writer.add (ModulePort (f.name, 'output', f.width))
 
         # Add AHB3 ports
         for p in AHB3_MASTER_PORTS:
@@ -205,7 +256,7 @@ class CSRGen:
             
         # Ports only applicable to IP instantiation
         # Add access bits
-        access = '';
+        access = ''
         for r in self.reg:
             access = r.access + ',' + access;
         access = access[:-1] # remove trailing comma
@@ -226,27 +277,31 @@ class CSRGen:
         #
 
         # Create signal wires
-        for r in self.reg:
-            for f in r.field:
-                if r.rtype == 'rw' or r.rtype == 'w1c':
-                    # Add wires
+        for f in self.field:
+            if f.rtype == 'rw' or f.rtype == 'w1c':
+                # Add wires
+                if f.count == 1:
                     self.template_writer.add (Logic (f.name + '_i', f.width))
                     self.template_writer.add (Logic (f.name + '_o', f.width))
-                    # Add ports
-                    ports += [Port (f.name + '_i', f.name + '_i')]
-                    ports += [Port (f.name + '_o', f.name + '_o')]
                 else:
-                    # Add wires
-                    self.template_writer.add (Logic (f.name, f.width))
-                    # Add ports
-                    ports += [Port (f.name, f.name)]
+                    self.template_writer.add (Logic ('[' + str(f.width - 1) + ':0] ' + f.name + '_i', f.count))
+                    self.template_writer.add (Logic ('[' + str(f.width - 1) + ':0] ' + f.name + '_o', f.count))
+
+                # Add ports
+                ports += [Port (f.name + '_i', f.name + '_i')]
+                ports += [Port (f.name + '_o', f.name + '_o')]
+            else:
+                # Add wires
+                self.template_writer.add (Logic (f.name, f.width))
+                # Add ports
+                ports += [Port (f.name, f.name)]
 
         # Insantiate custom module
         self.template_writer.add (Instance (self.name, self.name+'0', [], ports))
 
         # Write out file
         self.template_writer.write(file[:-2]+'vh')
-        
+
         # Create core file
         core_file = self.vlnv.split(':')[2]+'.core'
         vlnv = self.vlnv

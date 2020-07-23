@@ -40,12 +40,12 @@ module ahb3lite_csr
    // Internal signals
    logic                    we;  // Write enable
    logic [3:0]              be;  // Byte enable
-   logic [CNT-1:0]          sel; // Register select
+   logic [$clog2(CNT)-1:0]  sel; // Register select
    
    // No wait states for this core
    assign HREADYOUT = 1'b1;
    assign HRESP     = HRESP_OKAY;
-   assign sel       = HADDR[CNT+1:2];
+   assign sel       = HADDR[$clog2(CNT)+1:2];
 
    // Generate byte enable
    assign be = (HSIZE == HSIZE_WORD) ? 4'hf :
@@ -78,7 +78,7 @@ module ahb3lite_csr
           begin
 
              // Handle AHB writes
-             if (we & (sel < CNT))
+             if (we & (32'(sel) < CNT))
                
                // Switch on access mode
                case (ACCESS[sel])
@@ -97,7 +97,7 @@ module ahb3lite_csr
              if (ACCESS[sel] == 2'b10) // Write only
                HRDATA <= 32'h0;
              else
-               HRDATA <= (sel < CNT) ? REGIN[sel] : 32'hdeadbeef;                  
+               HRDATA <= (32'(sel) < CNT) ? REGIN[sel] : 32'hdeadbeef;                  
              
           end // if (RESETn)
      end // always @ (posedge CLK)
