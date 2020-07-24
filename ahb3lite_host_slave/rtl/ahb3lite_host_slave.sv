@@ -81,7 +81,15 @@ module ahb3lite_host_slave
 
    // Shift data based on address
    assign sdat = HWDATA >> (8 * addr[1:0]);
-     
+
+   // Mux response signals
+   logic [31:0]                   dslv_HRDATA, slv_HRDATA;
+   logic                          dslv_HREADYOUT, slv_HREADYOUT;
+   logic                          dslv_HRESP, slv_HRESP;
+   assign HRDATA =    EN ? slv_HRDATA    : dslv_HRDATA;
+   assign HRESP =     EN ? slv_HRESP     : dslv_HRESP;
+   assign HREADYOUT = EN ? slv_HREADYOUT : dslv_HREADYOUT;
+   
    //
    // When host slave is not enabled use default slave to return error
    //
@@ -92,9 +100,9 @@ module ahb3lite_host_slave
                       .HSEL       (HSEL & ~EN),
                       .HTRANS     (HTRANS),
                       .HREADY     (HREADY),
-                      .HREADYOUT  (HREADYOUT),
-                      .HRESP      (HRESP),
-                      .HRDATA     (HRDATA)
+                      .HREADYOUT  (dslv_HREADYOUT),
+                      .HRESP      (dslv_HRESP),
+                      .HRDATA     (dslv_HRDATA)
                       );
    
    always @(posedge CLK)
@@ -106,8 +114,8 @@ module ahb3lite_host_slave
           icnt <= 0;
           ocnt <= 0;
           state <= IDLE;
-          //HRESP <= HRESP_OKAY; handled by default slave
-          //HREADYOUT <= 1;
+          slv_HRESP <= HRESP_OKAY;
+          slv_HREADYOUT <= 1;
        end
      else if (EN)
        begin
@@ -135,7 +143,7 @@ module ahb3lite_host_slave
               begin
 
                  // Return no error
-                 HRESP <= HRESP_OKAY;
+                 slv_HRESP <= HRESP_OKAY;
                  
                  // Respond to bus transactions
                  if (HSEL & HREADY &&
@@ -144,7 +152,7 @@ module ahb3lite_host_slave
                    begin
                       
                       // Assert busy immediately - we know this will take many cycles
-                      HREADYOUT <= 0;
+                      slv_HREADYOUT <= 0;
                       size <= HSIZE[1:0];
                       write <= HWRITE;
                       addr <= HADDR;
@@ -232,7 +240,7 @@ module ahb3lite_host_slave
                  // If error extend one more cycle
                  if (err)
                    begin
-                      HRESP <= HRESP_ERROR;
+                      slv_HRESP <= HRESP_ERROR;
                       state <= ERRDELAY;
                    end
                  else
@@ -241,16 +249,16 @@ module ahb3lite_host_slave
                       // If read then move to bus
                       if (~write)
                         casez (size[1:0])
-                          2'b00: HRDATA <= {dati[7:0], dati[7:0], dati[7:0], dati[7:0]};
-                          2'b01: HRDATA <= {dati[15:0], dati[15:0]};
-                          2'b1?: HRDATA <= dati[31:0];
+                          2'b00: slv_HRDATA <= {dati[7:0], dati[7:0], dati[7:0], dati[7:0]};
+                          2'b01: slv_HRDATA <= {dati[15:0], dati[15:0]};
+                          2'b1?: slv_HRDATA <= dati[31:0];
                         endcase // casez (size[1:0])
                       
                       // Write OKAY
-                      HRESP <= HRESP_OKAY;
+                      slv_HRESP <= HRESP_OKAY;
                       
                       // Deassert HREADYOUT
-                      HREADYOUT <= 1;
+                      slv_HREADYOUT <= 1;
 
                       // Back to IDLE
                       state <= IDLE;
@@ -262,7 +270,7 @@ module ahb3lite_host_slave
             ERRDELAY:
               begin
 
-                 HREADYOUT <= 1;
+                 slv_HREADYOUT <= 1;
                  state <= IDLE;
               end
 

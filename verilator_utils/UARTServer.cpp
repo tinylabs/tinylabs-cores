@@ -32,7 +32,7 @@ int UARTServer::doUARTServer (uint64_t t, uint8_t tx_pin, uint8_t *rx_pin)
     return true;
 
   // TX state machine
-  if (!tx_start || (((t - tx_start) % 64) == 0)) {
+  if (!tx_start || (((t - tx_start) % (period * 2)) == 0)) {
     switch (tx_state) {
       
       // Look for start bit
@@ -71,7 +71,7 @@ int UARTServer::doUARTServer (uint64_t t, uint8_t tx_pin, uint8_t *rx_pin)
   }
 
   // Receive state machine
-  if (!rx_start || (((t - rx_start) % 64) == 0)) {
+  if (!rx_start || (((t - rx_start) % (period * 2)) == 0)) {
     switch (rx_state) {
       
       // Check for new data

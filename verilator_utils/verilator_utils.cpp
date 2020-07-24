@@ -15,7 +15,7 @@ VerilatorUtils::VerilatorUtils(uint32_t *mem)
     uartServerEnable(false), uartServerPort(7777) {
   tfp = new VerilatedVcdC;
   jtag_server = new JTAGServer (8);
-  uart_server = new UARTServer (0);
+  uart_server = new UARTServer (4); // period=oversample rate
     
   Verilated::traceEverOn(true);
   printf("Tracing on\n");

@@ -5,10 +5,10 @@ description: UART transport for host bridge
 filesets:
     rtl:
         files:
-            - rtl/baud_rate_gen.v
-            - rtl/receiver.v
+            - rtl/baud_rate_gen.sv
+            - rtl/receiver.sv
             - rtl/transmitter.v
-            - rtl/uart_transport.v
+            - rtl/uart_transport.sv
         file_type: verilogSource
 
 targets:

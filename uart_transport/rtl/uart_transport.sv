@@ -1,6 +1,7 @@
 module uart_transport # (
-                        parameter FREQ = 50000000,
-                        parameter BAUD = 115200
+                         parameter FREQ = 50000000,
+                         parameter BAUD = 115200,
+                         parameter OVERSAMPLE = 16
                         )
    (
     /* Clock */
@@ -77,8 +78,9 @@ module uart_transport # (
      end
    
    baud_rate_gen #(
-                   .FREQ   (FREQ),
-                   .BAUD   (BAUD)
+                   .FREQ       (FREQ),
+                   .BAUD       (BAUD),
+                   .OVERSAMPLE (OVERSAMPLE)
                    ) uart_baud (
                                 .clk (CLK),
 			                    .rxclk_en(rxclk_en),
@@ -92,13 +94,16 @@ module uart_transport # (
 		                .tx_busy (tx_busy),
 		                .clken   (txclk_en)
                         );
-   receiver uart_rx (
-		             .clk     (CLK),
-		             .data    (FIFO_DOUT),
-                     .rx      (RX_PIN),
-		             .rdy     (rx_rdy),
-		             .rdy_clr (rx_rdy_clr),
-		             .clken   (rxclk_en)
-                     );
+   receiver #(
+              .OVERSAMPLE (OVERSAMPLE)
+              )
+   uart_rx (
+		    .clk     (CLK),
+		    .data    (FIFO_DOUT),
+            .rx      (RX_PIN),
+		    .rdy     (rx_rdy),
+		    .rdy_clr (rx_rdy_clr),
+		    .clken   (rxclk_en)
+            );
 
 endmodule

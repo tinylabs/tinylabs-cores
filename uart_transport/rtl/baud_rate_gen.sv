@@ -3,8 +3,9 @@
  * rx/tx pair where the rx clcken oversamples by 16x.
  */
 module baud_rate_gen # (
-                       parameter FREQ = 50000000,
-                       parameter BAUD = 115200
+                        parameter FREQ = 50000000,
+                        parameter BAUD = 115200,
+                        parameter OVERSAMPLE = 16
                        ) 
    (
     input        clk,
@@ -12,12 +13,12 @@ module baud_rate_gen # (
 	output logic txclk_en
     );
    
-   localparam RX_ACC_MAX   = FREQ / (BAUD * 16);
+   localparam RX_ACC_MAX   = FREQ / (BAUD * OVERSAMPLE);
    localparam TX_ACC_MAX   = FREQ / BAUD;
-   localparam RX_ACC_WIDTH = $clog2(RX_ACC_MAX);
+   localparam RX_ACC_WIDTH = $clog2(RX_ACC_MAX) + 1;
    localparam TX_ACC_WIDTH = $clog2(TX_ACC_MAX);
-   logic [RX_ACC_WIDTH - 1:0] rx_acc;
-   logic [TX_ACC_WIDTH - 1:0] tx_acc;
+   logic [RX_ACC_WIDTH - 1:0]     rx_acc;
+   logic [TX_ACC_WIDTH - 1:0]     tx_acc;
    
    assign rxclk_en = (rx_acc == 0) ? 1 : 0;
    assign txclk_en = (tx_acc == 0) ? 1 : 0;
