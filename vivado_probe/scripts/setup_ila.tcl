@@ -1,0 +1,10 @@
+# Setup ILA
+add_files -fileset utils_1 [glob instantiate_ila.tcl]
+set_property USED_IN_SYNTHESIS false [get_files insert_ila.tcl]
+set_property USED_IN_SYNTHESIS false [get_files instantiate_ila.tcl]
+#set_property USED_IN_IMPLEMENTATION false [get_files insert_ila.tcl]
+#set_property USED_IN_IMPLEMENTATION false [get_files instantiate_ila.tcl]
+set_property USED_IN_SIMULATION false [get_files insert_ila.tcl]
+set_property USED_IN_SIMULATION false [get_files instantiate_ila.tcl]
+#source [get_files ila.tcl]
+set_property STEPS.OPT_DESIGN.TCL.PRE [get_files instantiate_ila.tcl] [get_runs impl_1]

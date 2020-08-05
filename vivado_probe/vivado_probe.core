@@ -1,0 +1,14 @@
+CAPI=2:
+name: ::vivado_probe:1.0
+
+filesets:
+    scripts:
+        files:
+            - "tool_vivado? (scripts/instantiate_ila.tcl)" : {file_type : user, copyto : instantiate_ila.tcl}
+            - "tool_vivado? (scripts/insert_ila.tcl)" : {file_type : SDC}
+            - "tool_vivado? (scripts/setup_ila.tcl)" : {file_type : tclSource}
+            
+targets:
+    default:
+        description: Vivado ILA probe autogen
+        filesets : [scripts]
