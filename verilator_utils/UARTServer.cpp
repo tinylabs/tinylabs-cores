@@ -59,7 +59,6 @@ int UARTServer::doUARTServer (uint64_t t, uint8_t tx_pin, uint8_t *rx_pin)
           printf ("Stop bit error!\n");
         
         // Add to transmit queue
-        //printf ("=> %02X\n", rxc);
         rx.enqueue (rxc);
         
         // Reset variables
@@ -100,15 +99,17 @@ int UARTServer::doUARTServer (uint64_t t, uint8_t tx_pin, uint8_t *rx_pin)
         *rx_pin = 1;
         rx_state = STATE_DONE;
         break;
-
-        // Reset state machine
-      case STATE_DONE:
-        rx_state = STATE_IDLE;
-        txc = tcnt = 0;
-        rx_start = 0;
-        break;
     }
   }
+
+  // Back to IDLE state
+  if ((rx_state == STATE_DONE) && (((t - rx_start) % (period * 2)) == ((period * 2) - 2))) {
+    // Reset state machine
+    rx_state = STATE_IDLE;
+    txc = tcnt = 0;
+    rx_start = 0;
+  }
+    
   return true;
 }
 

@@ -5,9 +5,8 @@ description: UART transport for host bridge
 filesets:
     rtl:
         files:
-            - rtl/baud_rate_gen.sv
             - rtl/receiver.sv
-            - rtl/transmitter.v
+            - rtl/transmitter.sv
             - rtl/uart_transport.sv
         file_type: verilogSource
 

@@ -86,8 +86,10 @@ module fifo_arb_tx #(
    logic                          c1_psel, c2_psel;
    logic [FIFO_PAYLOAD_WIDTH-1:0] dcnt;
    wire [DWIDTH-1:0]              data;
+   logic [DWIDTH-1:0]             store; // Buffer value if wrfull goes high mid transfer
    wire                           hold;
    wire                           c1_sel, c2_sel;
+   logic                          backpressure;
    
    // Debug only
    //wire [DWIDTH-1:0]    cmd;
@@ -97,18 +99,18 @@ module fifo_arb_tx #(
    assign hold = (dcnt == 0) & (((data >> CSHIFT) & CMASK) != 0) ? 1 : 0;
 
    // FIFO selection
-   assign c1_sel  = ~fifo_wrfull & (~c2_psel & (~c1_rdempty | (c1_psel & hold) | (c1_psel & (dcnt > 0))));
-   assign c2_sel  = ~fifo_wrfull & (~c1_psel & (~c2_rdempty | (c2_psel & hold) | (c2_psel & (dcnt > 0))));
-   assign c1_rden = c1_sel & ~c1_rdempty;
-   assign c2_rden = c2_sel & ~c2_rdempty;
+   assign c1_sel  = (~c2_psel & (~c1_rdempty | (c1_psel & hold) | (c1_psel & (dcnt > 0))));
+   assign c2_sel  = (~c1_psel & (~c2_rdempty | (c2_psel & hold) | (c2_psel & (dcnt > 0))));
+   assign c1_rden = c1_sel & ~c1_rdempty & ~fifo_wrfull & ~backpressure;
+   assign c2_rden = c2_sel & ~c2_rdempty & ~fifo_wrfull & ~backpressure;
    
    // Data connected to current selected FIFO
    assign data = c1_prden ? c1_rddata : 
                  (c2_prden ? c2_rddata : 0);
 
    // Write to output fifo
-   assign fifo_wren = ~fifo_wrfull & data_valid;
-   assign fifo_wrdata = data;
+   assign fifo_wren = ~fifo_wrfull & (data_valid | backpressure);
+   assign fifo_wrdata = backpressure ? store : data;
    
    always @(posedge CLK)
      begin
@@ -120,6 +122,7 @@ module fifo_arb_tx #(
              c2_psel <= 0;
              data_valid <= 0;
              dcnt <= 0;
+             backpressure <= 0;
           end
         else 
           begin
@@ -138,6 +141,15 @@ module fifo_arb_tx #(
              if (data_valid & (dcnt != 0))
                dcnt <= dcnt - 1;
 
+             // Save value if sink buffer full
+             if (fifo_wrfull & data_valid & ~backpressure)
+               begin
+                  store <= data;
+                  backpressure <= 1;
+               end
+             else if (~fifo_wrfull)
+               backpressure <= 0;
+             
              // Save previous rden
              c1_prden <= c1_rden;
              c2_prden <= c2_rden;

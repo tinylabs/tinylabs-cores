@@ -211,15 +211,19 @@ proc insert_ila { depth } {
         connect_debug_port ila_1/trig_in [get_nets $trig_out]
         connect_debug_port ila_1/trig_in_ack [get_nets $trig_out_ack]
     } 
-    set project_found [get_projects -quiet] 
-    #if { $project_found != "New Project" } {
-    #    puts "Saving constraints now in project [current_project -quiet]"
-    #    save_constraints_as debug_constraints.xdc
-    #}    
     ##################################################################
     implement_debug_core
     ##################################################################
     # write out probe info file
     write_debug_probes -force debug_nets.ltx
+
+    set project_found [get_projects -quiet] 
+    if { $project_found != "New Project" } {
+        puts "Saving constraints now in project [current_project -quiet]"
+        #save_project_as [current_project]        
+        #save_constraints_as -target_constrs_file debug_constraints.xdc constrs_1
+        #write_xdc debug_constraints.xdc
+        #add_files -fileset constrs_1 [glob debug_constraints.xdc]
+    }    
 }
 
