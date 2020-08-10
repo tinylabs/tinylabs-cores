@@ -1,0 +1,16 @@
+CAPI=2:
+name: ::uart_fifo:0.1
+
+filesets:
+    rtl:
+        files:
+            - rtl/rxuartlite.v
+            - rtl/txuartlite.v
+            - rtl/uart_fifo.sv
+        file_type: verilogSource
+
+targets:
+    default:
+        description: Simple 8N1 UART with external FIFO interface
+        filesets : [rtl]
+        
