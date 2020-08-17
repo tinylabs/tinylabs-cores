@@ -71,11 +71,10 @@ void Server::Send (int sockfd, char *buf, int len)
 
 void Server::Listen (void)
 {
-  int nsockfd;
+  int nsockfd, n, i;
   socklen_t clilen;
   char cmd[256], resp[256];
   struct sockaddr_in serv_addr, cli_addr;
-  int n, i;
 
   /* Set running */
   running = 1;
@@ -147,7 +146,8 @@ void Server::Listen (void)
 
       // Process each command
       for (i = 0; i < n; i++)
-        tx.enqueue (cmd[i]);
+        if (!tx.enqueue (cmd[i]))
+          printf ("Failed to queue\n");
     }
     
     // Empty receive buffer

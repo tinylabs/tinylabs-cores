@@ -11,6 +11,7 @@
 #include "UARTServer.h"
 #include <stdio.h>
 #include <stdint.h>
+#include <inttypes.h>
 
 typedef enum {
               STATE_IDLE = 0,
@@ -56,10 +57,11 @@ int UARTServer::doUARTServer (uint64_t t, uint8_t tx_pin, uint8_t *rx_pin)
         // Check stop bit
       case STATE_STOP:
         if (!tx_pin)
-          printf ("Stop bit error!\n");
+          printf ("Stop bit error! %" PRIu64 "\n", t);
         
         // Add to transmit queue
-        rx.enqueue (rxc);
+        if (!rx.enqueue (rxc))
+          printf ("Failed to queue byte\n");
         
         // Reset variables
         tx_state = STATE_IDLE;

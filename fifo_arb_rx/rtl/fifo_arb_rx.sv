@@ -90,13 +90,13 @@ module fifo_arb_rx #(
    logic [DWIDTH-1:0]             pcmd;
    
    // Mostly combinatorial logic
-   assign fifo_rden = ~fifo_rdempty & ~c1_wrfull & ~c2_wrfull;
+   assign fifo_rden = !fifo_rdempty & !c1_wrfull & !c2_wrfull & !c1_wren & !c2_wren;
    assign c1_wrdata = fifo_rddata;
    assign c2_wrdata = fifo_rddata;
    assign sel = (dcnt != 0) ? psel :
                 ((cmd & SELMASK) != 0 ? 1 : 0);
-   assign c1_wren = data_valid & sel  ? 1'b1 : 1'b0;
-   assign c2_wren = data_valid & !sel ? 1'b1 : 1'b0;
+   assign c1_wren = data_valid &  sel & !c1_wrfull ? 1'b1 : 1'b0;
+   assign c2_wren = data_valid & !sel & !c2_wrfull ? 1'b1 : 1'b0;
    assign cmd = (dcnt == 0) & data_valid ? fifo_rddata : pcmd;
    
    always @(posedge CLK)
