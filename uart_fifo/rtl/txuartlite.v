@@ -140,7 +140,7 @@ module txuartlite(i_clk, i_wr, i_data, o_uart_tx, o_busy);
 	always @(posedge i_clk)
 	  if ((i_wr)&&(!r_busy))
 		lcl_data <= i_data;
-      else if ((state == `TXUL_STOP) && i_wr)
+      else if (zero_baud_counter && (state > `TXUL_STOP) && i_wr)
 		lcl_data <= i_data;
 	  else if (zero_baud_counter)
 		lcl_data <= { 1'b1, lcl_data[7:1] };
@@ -156,7 +156,9 @@ module txuartlite(i_clk, i_wr, i_data, o_uart_tx, o_busy);
 	initial	o_uart_tx = 1'b1;
 	always @(posedge i_clk)
 		if ((i_wr)&&(!r_busy))
-			o_uart_tx <= 1'b0;	// Set the start bit on writes
+		  o_uart_tx <= 1'b0;	// Set the start bit on writes
+        else if (zero_baud_counter && (state > `TXUL_STOP) && i_wr)
+          o_uart_tx <= 1'b0;  // Immediate continuation start bit
 		else if (zero_baud_counter)	// Set the data bit.
 			o_uart_tx <= lcl_data[0];
 	// }}}
