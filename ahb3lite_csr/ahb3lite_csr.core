@@ -1,5 +1,6 @@
 CAPI=2:
 name: ::ahb3lite_csr:0.1
+description: Generator for CSR AHB3 slave
 
 filesets:
     rtl:
@@ -12,9 +13,9 @@ filesets:
 targets:
     default:
         filesets: [rtl]
-        description: Generator for CSR AHB3 slave
 
 generators:
     ahb3lite_csr_gen:
         interpreter: python
         command: sw/ahb3lite_csr.py
+        description: Generate AHB3lite CSR slave

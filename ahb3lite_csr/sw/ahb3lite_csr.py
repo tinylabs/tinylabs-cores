@@ -4,6 +4,7 @@ from collections import OrderedDict, defaultdict
 import yaml
 import math
 import re
+from cppwriter import *
 
 from verilogwriter import Signal, Wire, Instance, ModulePort, VerilogWriter, LocalParam, Assign, Logic
 
@@ -158,6 +159,9 @@ class CSRGen:
 
         # Dump registers
         self.dump ()
+
+        # Create CPPwriter
+        self.cppwriter = CPPWriter (self.field)
         
     def dump(self):
         addr = -1
@@ -309,7 +313,8 @@ class CSRGen:
             f.write('CAPI=2:\n')
             files = [{file     : {'file_type' : 'verilogSource'}},
                      {file[:-2]+'vh' : {'is_include_file' : True,
-                                  'file_type' : 'verilogSource'}}
+                                        'file_type' : 'verilogSource'}},
+                     {file[:-2]+'h' : {'file_type' : 'user', 'copyto' : file[:-2]+'h'}}
             ]
             coredata = {'name' : vlnv,
                         'targets' : {'default' : {}},
@@ -319,6 +324,9 @@ class CSRGen:
             coredata['targets']['default']['filesets'] = ['rtl']
 
             f.write(yaml.dump(coredata))
+
+        # Write CPP header
+        self.cppwriter.write (file[:-2]+'h')
 
 if __name__ == "__main__":
     if len(sys.argv) == 4:

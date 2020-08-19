@@ -26,6 +26,7 @@ generators:
     ahb3lite_intercon_gen:
         interpreter : python
         command : sw/ahb3lite_intercon.py
+        description: Generate AHB3lite interconnect from memory map
         
 provider:
     name : github
