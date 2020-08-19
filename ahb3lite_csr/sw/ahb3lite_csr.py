@@ -60,6 +60,15 @@ class Field:
             return '\t' + self.name + ':' + str(self.rptr[0].offset) + ':' + str (self.width)
         else:
             return '\t' + self.name + '[' + str(n) + ']:' + str(self.rptr[n].offset) + ':' + str (self.width)
+    # These are used by CPPWriter only
+    def offset(self):
+        return self.name.upper() + '_OFF'
+    def shift(self):
+        return self.name.upper() + '_SHT'
+    def mask(self):
+        return self.name.upper() + '_MSK'
+    def maximum(self):
+        return self.name.upper() + '_MAX'
     
 class Reg:
     def __init__(self, rtype, address):
@@ -161,7 +170,7 @@ class CSRGen:
         self.dump ()
 
         # Create CPPwriter
-        self.cppwriter = CPPWriter (self.field)
+        self.cppwriter = CPPWriter (self.name, self.field)
         
     def dump(self):
         addr = -1
