@@ -213,7 +213,11 @@ module cm3_min_soc
    cm3_core
      #(
        .XILINX_ENC_CM3  (XILINX_ENC_CM3),
-       .NUM_IRQ         (16)
+       .NUM_IRQ         (16),
+       .SINGLE_MEMORY   (0),
+       .CACHE_ENABLE    (0),
+       .ROM_SZ          (ROM_SZ),
+       .RAM_SZ          (RAM_SZ)
        )
      u_cm3 (
             // Clock and reset

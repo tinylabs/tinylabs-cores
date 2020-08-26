@@ -15,7 +15,11 @@
 
 module cm3_core #(
                   parameter NUM_IRQ = 16,
-                  parameter XILINX_ENC_CM3 = 0
+                  parameter XILINX_ENC_CM3 = 0,
+                  parameter SINGLE_MEMORY = 0,
+                  parameter CACHE_ENABLE = 0,
+                  parameter ROM_SZ = 0,
+                  parameter RAM_SZ = 0
                   )
    (
     // Clock and reset
@@ -110,6 +114,9 @@ module cm3_core #(
    wire                 exresps;
    wire                 hwrites; // Intermediate HWRITE signal
 
+   // System address mux
+   wire [31:0]          sys_haddr;
+   
    // Loopback power request
    wire                 cdbgpwrup;
 
@@ -177,6 +184,26 @@ module cm3_core #(
                  .EXREQC  (),
                  .EXRESPC (1'b1) // Disable exclusive access on code bus
                  );
+
+   // Generate DATA accesses directly after ROM when enabled.
+   generate
+      if (SINGLE_MEMORY == 1) begin : mux_mem
+         assign sys_HADDR = (sys_haddr >= 32'h2000_0000) & (sys_haddr < (32'h2000_0000 + RAM_SZ)) ?
+                            (sys_haddr - 32'h2000_0000) + ROM_SZ :
+                            sys_haddr;
+      end
+      else begin : mux_mem
+         assign sys_HADDR = sys_haddr; // Pass thru
+      end
+   endgenerate
+
+   generate
+      if (CACHE_ENABLE == 1) begin : gen_cache
+
+         // Add cache logic here
+         
+      end
+   endgenerate
    
    // Instantiate core wrapper
    generate
@@ -311,7 +338,7 @@ module cm3_core #(
                 .HRESPS        ({1'b0, sys_HRESP}),
                 .HTRANSS       (sys_HTRANS),
                 .HSIZES        (sys_HSIZE),
-                .HADDRS        (sys_HADDR),
+                .HADDRS        (sys_haddr),
                 .HBURSTS       (sys_HBURST),
                 .HPROTS        (sys_HPROT),
                 .HWRITES       (hwrites),
@@ -452,7 +479,7 @@ module cm3_core #(
                   .HRESPS        ({1'b0, sys_HRESP}),
                   .HTRANSS       (sys_HTRANS),
                   .HSIZES        (sys_HSIZE),
-                  .HADDRS        (sys_HADDR),
+                  .HADDRS        (sys_haddr),
                   .HBURSTS       (sys_HBURST),
                   .HPROTS        (sys_HPROT),
                   .HWRITES       (hwrites),

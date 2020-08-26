@@ -1,0 +1,11 @@
+CAPI=2:
+name: ::vivado_ipgen:0.1
+description: Takes vivado root (optional) and filenames to generate core file.
+
+generators:
+    vivado_ipgen:
+        interpreter: python
+        command: sw/vivado_ipgen.py
+        description: Generate core file for builtin Vivado IP
+
+        
