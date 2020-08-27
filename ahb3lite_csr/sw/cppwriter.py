@@ -51,7 +51,7 @@ class CPPWriter:
                     s += '#define ' + f.shift() + '\t' + str(f.rptr[0].offset) + '\n'
                     s += '#define ' + f.mask() + '\t' + hex(2 ** f.width - 1) + '\n'
                 else:
-                    s += self.name + '_t ' + f.name + '_n[' + str(f.count) + '] = {\n'
+                    s += 'static ' + self.name + '_t ' + f.name + '_n[' + str(f.count) + '] = {\n'
                     for n in range (f.count):
                         s += '\t{' + str(f.rptr[n].reg.address) + ', ' + str(f.rptr[n].offset) + '},\n'
                     s += '};\n'
