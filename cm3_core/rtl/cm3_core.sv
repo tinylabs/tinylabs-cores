@@ -5,7 +5,7 @@
  *  2020
  *
  * Parameters:
- *   NUM_IRQ - Number of IRQs to core (fixed if XILINX_ENC_CM3 not defined)
+ *   NUM_IRQ - Number of IRQs to core (fixed if XILINX_ENC_CM3==0)
  * 
  * Defines:
  *   XILINX_ENC_CM3 - Define to synthesize full core for xilinx (using encrypted IP)
@@ -212,7 +212,13 @@ module cm3_core #(
          // Instantiate encrypted xilinx core
          CORTEXM3INTEGRATION
            #(
-             .NUM_IRQ   (NUM_IRQ)
+             .NUM_IRQ        (NUM_IRQ),
+             .MPU_PRESENT    (0),  // Diable MPU
+             .BB_PRESENT     (0),  // Disable bitbanding
+             .TRACE_LVL      (0),  // Disable trace
+             .DEBUG_LVL      (3),  // Enable full debug
+             .RESET_ALL_REGS (0),
+             .WIC_PRESENT    (0)
              )
          u_cm3 (
                 // Clocks
@@ -223,7 +229,7 @@ module cm3_core #(
                 
                 // Reset
                 .PORESETn    (PORESETn),
-                .SYSRESETn   (CPURESETn),
+                .SYSRESETn   (CPURESETn | cdbgpwrup), // Suppress cpureset when debug active
                 .SYSRESETREQ (SYSRESETREQ),
                 
                 // Interrupts
