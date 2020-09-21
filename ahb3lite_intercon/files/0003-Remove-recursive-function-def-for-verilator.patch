@@ -1,0 +1,33 @@
+From 52db314c841b144dfa38fa0dfd019b6a96362f1f Mon Sep 17 00:00:00 2001
+From: Elliot Buller <elliot@tinylabs.io>
+Date: Mon, 21 Sep 2020 15:55:04 -0600
+Subject: [PATCH 3/3] Remove recursive function def for verilator
+
+---
+ rtl/verilog/ahb3lite_interconnect_slave_port.sv | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/rtl/verilog/ahb3lite_interconnect_slave_port.sv b/rtl/verilog/ahb3lite_interconnect_slave_port.sv
+index 3400e6f..b1bdb56 100644
+--- a/rtl/verilog/ahb3lite_interconnect_slave_port.sv
++++ b/rtl/verilog/ahb3lite_interconnect_slave_port.sv
+@@ -161,6 +161,7 @@ module ahb3lite_interconnect_slave_port #(
+    * Intel Quartus does not support recursive functions.
+    * Even though this one would be perfectly fine
+   */
++`ifdef RECURSIVE_FUNCTIONS_SUPPORTED
+   function automatic [MASTER_BITS-1:0] highest_requested_priority (
+     input [MASTERS-1:0]                  hsel,
+     input [MASTERS-1:0][MASTER_BITS-1:0] priorities,
+@@ -185,7 +186,7 @@ module ahb3lite_interconnect_slave_port #(
+     //finally compare lo and hi priorities
+     return (priority_hi > priority_lo) ? priority_hi : priority_lo;
+   endfunction : highest_requested_priority
+-
++`endif // RECURSIVE_FUNCTIONS_SUPPORTED
+ 
+   //If every master has its own unique priority, this just becomes HSEL
+   function [MASTERS-1:0] requesters;
+-- 
+2.25.1
+
