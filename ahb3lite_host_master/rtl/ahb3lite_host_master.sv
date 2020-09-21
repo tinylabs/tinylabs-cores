@@ -104,7 +104,7 @@ module ahb3lite_host_master
             begin
                ocnt <= ocnt - 1;
                WRDATA <= dato[7:0];
-               dato <= {8'h0, dato[OWIDTH-1:8]};
+               dato[OWIDTH-8-1:0] <= dato[OWIDTH-1:8];
             end
           
           // State machine
@@ -241,16 +241,21 @@ module ahb3lite_host_master
                       else if (~HWRITE)
                         begin
                            casez (cmd[1:0])
-                             2'b00: begin 
-                                dato <= {HRDATA[31:0] >> (HADDR[1:0] * 8)};
+                             2'b00: begin
+                                case (HADDR[1:0])
+                                  2'b00: dato[7:0] <= HRDATA[7:0];
+                                  2'b01: dato[7:0] <= HRDATA[15:8];
+                                  2'b10: dato[7:0] <= HRDATA[23:16];
+                                  2'b11: dato[7:0] <= HRDATA[31:24];
+                                endcase // case (HADDR[1:0])
                                 WRDATA <= {cmd[7], FIFO_D1, 4'h0};
                                 ocnt <= 2; 
                              end
                              2'b01: begin
                                 if (HADDR[1])
-                                  dato <= {16'h0, HRDATA[23:16], HRDATA[31:24]};
+                                  dato[15:0] <= {HRDATA[23:16], HRDATA[31:24]};
                                 else
-                                  dato <= {16'h0, HRDATA[7:0], HRDATA[15:8]};
+                                  dato[15:0] <= {HRDATA[7:0], HRDATA[15:8]};
                                 WRDATA <= {cmd[7], FIFO_D2, 4'h0};
                                 ocnt <= 3; 
                              end

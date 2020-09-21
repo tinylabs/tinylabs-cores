@@ -66,7 +66,6 @@ module ahb3lite_host_slave
    logic                          dvalid; // Is fifo data valid
    state_t                        state;  // State machine
    wire                           err;
-   wire [31:0]                    sdat;   // Adjusted data based on address
    logic [1:0]                    size;   // HSIZE for current transaction
    logic                          write;  // HWRITE for current transaction
    logic [31:0]                   addr;   // HADDR
@@ -78,9 +77,6 @@ module ahb3lite_host_slave
    
    // Always read when not busy and data is expected
    assign RDEN = ~RDEMPTY && (icnt != 0);
-
-   // Shift data based on address
-   assign sdat = HWDATA >> (8 * addr[1:0]);
 
    // Mux response signals
    logic [31:0]                   dslv_HRDATA, slv_HRDATA;
@@ -161,9 +157,8 @@ module ahb3lite_host_slave
                       if (~HWRITE)
                         begin
                            // Send read to host
-                           dato <= {32'h0, 
-                                    HADDR[7:0], HADDR[15:8], HADDR[23:16], HADDR[31:24],
-                                    IBIT, FIFO_D4, HWRITE, 1'b0, HSIZE[1:0]};
+                           dato[39:0] <= {HADDR[7:0], HADDR[15:8], HADDR[23:16], HADDR[31:24],
+                                          IBIT, FIFO_D4, HWRITE, 1'b0, HSIZE[1:0]};
                            ocnt <= 5;
 
                            // Calc exprected response len
@@ -190,21 +185,33 @@ module ahb3lite_host_slave
                  casez (size[1:0])
                    2'b00: // byte access
                      begin
-                        dato <= {24'h0, sdat[7:0], 
-                                 addr[7:0], addr[15:8], addr[23:16], addr[31:24],
-                                 IBIT, FIFO_D5, write, 1'b0, size[1:0]};
+                        case (addr[1:0])
+                          2'b00: dato[47:0] <= {HWDATA[7:0], addr[7:0], addr[15:8], addr[23:16], addr[31:24],
+                                                IBIT, FIFO_D5, write, 1'b0, size[1:0]};
+                          2'b01: dato[47:0] <= {HWDATA[15:8], addr[7:0], addr[15:8], addr[23:16], addr[31:24],
+                                                IBIT, FIFO_D5, write, 1'b0, size[1:0]};
+                          2'b10: dato[47:0] <= {HWDATA[23:16], addr[7:0], addr[15:8], addr[23:16], addr[31:24],
+                                                IBIT, FIFO_D5, write, 1'b0, size[1:0]};
+                          2'b11: dato[47:0] <= {HWDATA[31:24], addr[7:0], addr[15:8], addr[23:16], addr[31:24],
+                                                IBIT, FIFO_D5, write, 1'b0, size[1:0]};
+                        endcase
                         ocnt <= 6;
                      end
                    2'b01: // hwrd access
                      begin
-                        dato <= {16'h0, sdat[7:0], sdat[15:8], 
-                                 addr[7:0], addr[15:8], addr[23:16], addr[31:24],
-                                 IBIT, FIFO_D6, write, 1'b0, size[1:0]};
+                        if (addr[1])
+                          dato[55:0] <= {HWDATA[23:16], HWDATA[31:24], 
+                                         addr[7:0], addr[15:8], addr[23:16], addr[31:24],
+                                         IBIT, FIFO_D6, write, 1'b0, size[1:0]};
+                        else
+                          dato[55:0] <= {HWDATA[7:0], HWDATA[15:8], 
+                                         addr[7:0], addr[15:8], addr[23:16], addr[31:24],
+                                         IBIT, FIFO_D6, write, 1'b0, size[1:0]};
                         ocnt <= 7;
                      end
                    2'b1?: // word access
                      begin
-                        dato <= {sdat[7:0], sdat[15:8], sdat[23:16], sdat[31:24],
+                        dato <= {HWDATA[7:0], HWDATA[15:8], HWDATA[23:16], HWDATA[31:24],
                                  addr[7:0], addr[15:8], addr[23:16], addr[31:24],
                                  IBIT, FIFO_D8, write, 1'b0, size[1:0]};
                         ocnt <= 9;
