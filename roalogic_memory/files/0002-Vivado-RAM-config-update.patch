@@ -1,0 +1,25 @@
+From 5133d03c2b2d7ef0da1248142e1e230c82525bde Mon Sep 17 00:00:00 2001
+From: Elliot Buller <elliot@tinylabs.io>
+Date: Tue, 22 Sep 2020 11:51:43 -0600
+Subject: [PATCH 2/2] Vivado RAM config update
+
+---
+ rtl/verilog/rl_ram_1r1w_generic.sv | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/rtl/verilog/rl_ram_1r1w_generic.sv b/rtl/verilog/rl_ram_1r1w_generic.sv
+index ec02099..bfcb0ed 100644
+--- a/rtl/verilog/rl_ram_1r1w_generic.sv
++++ b/rtl/verilog/rl_ram_1r1w_generic.sv
+@@ -90,7 +90,7 @@ module rl_ram_1r1w_generic #(
+   //
+   genvar i;
+ 
+-  logic [DBITS-1:0] mem_array [2**ABITS -1:0];  //memory array
++  (* ram_decomp = "power" *) logic [DBITS-1:0] mem_array [2**ABITS -1:0];  //memory array
+ 
+   generate
+      if (LOAD_FILE != "") begin : load_file
+-- 
+2.25.1
+
