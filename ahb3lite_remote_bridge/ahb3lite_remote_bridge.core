@@ -1,0 +1,19 @@
+CAPI=2:
+name: ::ahb3lite_remote_bridge:0.1
+description: Bridges AHB3lite to external target via SWD/JTAG
+
+filesets:
+    rtl:
+        depend:
+            - ahb3lite_pkg
+        files:
+            - rtl/ahb3lite_remote_bridge.sv
+            - rtl/clkdiv.sv
+            - rtl/swd_if.sv
+            - rtl/swd_phy.sv
+        file_type : verilogSource
+
+targets:
+    default:
+        filesets : [rtl]
+    
