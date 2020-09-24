@@ -16,9 +16,10 @@
 #include <netdb.h>
 #include <netinet/in.h>
 #include <sys/fcntl.h>
+#include <iostream>
 
 #include "Server.h"
-#include <iostream>
+#include "err.h"
 
 Server::Server (const char *name, uint32_t period, bool debug)
 {
@@ -48,7 +49,7 @@ void Server::Start (uint16_t port)
   #pragma GCC diagnostic ignored "-Wpmf-conversions"
   rv = pthread_create (&thread_id, NULL, (void *(*)(void *))&Server::Listen, this);
   if (rv)
-    perror ("Failed to spawn thread!");
+    fail ("Failed to spawn thread!");
 }
 
 void Server::Send (int sockfd, char *buf, int len)
@@ -64,8 +65,7 @@ void Server::Send (int sockfd, char *buf, int len)
   /* Write a response to the client */
   rv = write (sockfd, buf, len);
   if (rv < 0) {
-    perror ("ERROR writing to socket");
-    exit (1);
+    fail ("ERROR writing to socket");
   }
 }
 
@@ -82,8 +82,7 @@ void Server::Listen (void)
   /* First call to socket() function */
   sockfd = socket(AF_INET, SOCK_STREAM, 0);   
   if (sockfd < 0) {
-    perror("ERROR opening socket");
-    exit(1);
+    fail("ERROR opening socket");
   }
    
   /* Initialize socket structure */
@@ -97,8 +96,7 @@ void Server::Listen (void)
 
   /* Now bind the host address using bind() call.*/
   if (bind(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
-    perror("ERROR on binding");
-    exit(1);
+    fail("ERROR on binding");
   }
   
   /* Now start listening for the clients, here process will
@@ -111,7 +109,7 @@ void Server::Listen (void)
  restart_connection:
   nsockfd = accept(sockfd, (struct sockaddr *)&cli_addr, &clilen);
   if (nsockfd < 0) {
-    perror("ERROR on accept");
+    fail("ERROR on accept");
     goto done;
   }
 

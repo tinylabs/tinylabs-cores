@@ -13,10 +13,13 @@ filesets:
             - JTAGServer.h : {is_include_file : true}
             - UARTServer.cpp
             - UARTServer.h : {is_include_file : true}
+            - SWDClient.cpp
+            - SWDClient.h : {is_include_file : true}
             - Server.cpp
             - Server.h : {is_include_file : true}
             - readerwriterqueue.h : {is_include_file : true}
             - atomicops.h : {is_include_file : true}
+            - err.h : {is_include_file : true}
         file_type : cppSource
 
 targets:

@@ -4,7 +4,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
-#define err(fmt, ...) do {                      \
+#define fail(fmt, ...) do {                     \
     printf (fmt "\n", ##__VA_ARGS__);           \
     exit (-1);                                  \
   } while (0)
