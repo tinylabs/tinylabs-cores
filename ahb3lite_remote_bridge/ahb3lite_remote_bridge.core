@@ -6,6 +6,7 @@ filesets:
     rtl:
         depend:
             - ahb3lite_pkg
+            - cdc_utils
         files:
             - rtl/ahb3lite_remote_bridge.sv
             - rtl/clkdiv.sv

@@ -33,9 +33,8 @@ end
 // IRQ address to scan
 `define IRQ_BASE       32'hE000E280
 // Config status words
-`define CSW_CFG_BYTE   32'hA3000000
-`define CSW_CFG_HWRD   32'hA3000001
-`define CSW_CFG_WORD   32'hA3000002
+`define CSW_CFG        28'hA200000
+
 // Invalidate cache
 `define INVALIDATE_CACHE(idx)  cache_ap[idx][34] <= 1'b1;
 
@@ -48,7 +47,7 @@ module ahb3lite_remote_bridge
 
     // Control signals
     input                EN,
-    input [2:0]          CLKDIV,
+    input [4:0]          CLKDIV,
 
     // CTRL = APnDP | ADDR[2] | WRnRD | START
     input [4:0]          CTRLI,
@@ -182,7 +181,6 @@ module ahb3lite_remote_bridge
    logic               ahb_fixed_sz;  // Set to 1 if only word is supported
    logic [1:0]         ahb_sz;        // Current configured access 0=byte 1=hwrd 2=word
    logic [1:0]         ahb_req_sz;    // Requested size
-   logic [31:0]        ahb_csw;       // AHB config word
 
    // AP cache is used for more efficient IRQ scanning
    // it consists of a 3bit BD val (0-3=valid 4=invalid)
@@ -228,27 +226,27 @@ module ahb3lite_remote_bridge
    // SWD interface
    swd_if u_swd_if (
                     // Core signals
-                    .CLK    (CLK),
-                    .RESETn (RESETn),
-                    .EN     (if_enable),
+                    .CLK       (CLK),
+                    .RESETn    (RESETn),
+                    .EN        (if_enable),
                     // Hardware interface
-                    .SWDIN  (SWDIN),
-                    .SWDCLKIN (SWDCLKIN),
+                    .SWDIN     (SWDIN),
+                    .SWDCLKIN  (SWDCLKIN),
                     .SWDCLKOUT (SWDCLK),
-                    .SWDOUT (SWDOUT),
-                    .SWDOE  (SWDOE),
+                    .SWDOUT    (SWDOUT),
+                    .SWDOE     (SWDOE),
                     // Register interface
-                    .APnDP  (if_apndp),
-                    .ADDR   (if_addr),
-                    .DATI   (if_dati),
-                    .DATO   (if_dato),
-                    .WRITE  (if_write),
+                    .APnDP     (if_apndp),
+                    .ADDR      (if_addr),
+                    .DATI      (if_dati),
+                    .DATO      (if_dato),
+                    .WRITE     (if_write),
                     // Flags
-                    .VALID  (if_valid),
-                    .READY  (if_ready),
-                    .IDCODE (IDCODE),
-                    .ERR    (if_err),
-                    .CLR    (if_clr)
+                    .VALID     (if_valid),
+                    .READY     (if_ready),
+                    .IDCODE    (IDCODE),
+                    .ERR       (if_err),
+                    .CLR       (if_clr)
                     );
    
    // Remote AHB bridge
@@ -300,7 +298,7 @@ module ahb3lite_remote_bridge
                          ahb_addr <= -1;
                          ahb_pending <= 0;
                          ahb_latch_data <= 0;
-                         slv_HREADYOUT <= 0;
+                         slv_HREADYOUT <= 1;
                          IRQ <= 0;
                          `INVALIDATE_CACHE (0);
                          `INVALIDATE_CACHE (1);                         
@@ -375,7 +373,7 @@ module ahb3lite_remote_bridge
                  `DP_WRITE (STATE_CFG_CSW_WR, 2'b10, {AHB_APSEL, 16'h0, 8'h0}) // CSW select
 
                STATE_CFG_CSW_WR:
-                 `AP_WRITE (STATE_CFG_WAIT, 2'b00, {ahb_csw[31:2], ahb_req_sz}) // Write to CSW
+                 `AP_WRITE (STATE_CFG_WAIT, 2'b00, {`CSW_CFG, 2'b00, ahb_req_sz}) // Write to CSW
 
                // Wait for configuration to complete
                STATE_CFG_WAIT:
@@ -383,7 +381,6 @@ module ahb3lite_remote_bridge
                    begin
                       state <= STATE_IDLE;
                       ahb_sz <= ahb_req_sz;
-                      //$display ("CSW=%h", {ahb_csw[31:2], ahb_req_sz});
                    end
 
                // Send abort to cancel any previous errors
@@ -609,14 +606,14 @@ module ahb3lite_remote_bridge
                   // Remap address from local to remote
                   casez (addr_mask(HADDR - BASE_ADDR))
                     // 8x 32MB remaps
-                    4'b0_000: ahb_addr <= {REMAP32M[0][6:0], HADDR[24:0]};
-                    4'b0_001: ahb_addr <= {REMAP32M[1][6:0], HADDR[24:0]};
-                    4'b0_010: ahb_addr <= {REMAP32M[2][6:0], HADDR[24:0]};
-                    4'b0_011: ahb_addr <= {REMAP32M[3][6:0], HADDR[24:0]};
-                    4'b0_100: ahb_addr <= {REMAP32M[4][6:0], HADDR[24:0]};
-                    4'b0_101: ahb_addr <= {REMAP32M[5][6:0], HADDR[24:0]};
-                    4'b0_110: ahb_addr <= {REMAP32M[6][6:0], HADDR[24:0]};
-                    4'b0_111: ahb_addr <= {REMAP32M[7][6:0], HADDR[24:0]};
+                    4'b0_000: ahb_addr <= {REMAP32M[0][7:1], HADDR[24:0]};
+                    4'b0_001: ahb_addr <= {REMAP32M[1][7:1], HADDR[24:0]};
+                    4'b0_010: ahb_addr <= {REMAP32M[2][7:1], HADDR[24:0]};
+                    4'b0_011: ahb_addr <= {REMAP32M[3][7:1], HADDR[24:0]};
+                    4'b0_100: ahb_addr <= {REMAP32M[4][7:1], HADDR[24:0]};
+                    4'b0_101: ahb_addr <= {REMAP32M[5][7:1], HADDR[24:0]};
+                    4'b0_110: ahb_addr <= {REMAP32M[6][7:1], HADDR[24:0]};
+                    4'b0_111: ahb_addr <= {REMAP32M[7][7:1], HADDR[24:0]};
                     // 256MB remap (0x4000.0000 by default)                         
                     4'b1_???: ahb_addr <= {REMAP256M, HADDR[27:0]};
                   endcase

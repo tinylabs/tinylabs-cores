@@ -48,7 +48,12 @@ module swd_phy
    logic [63:0] so;
    logic        check;
    logic        pclk;
-   
+
+
+   // Synchronize slower clock using fast clock
+   logic        qSWDCLKIN;
+   sync2_pgen clk_sync (.c (CLK), .d (SWDCLKIN), .p (), .q (qSWDCLKIN));
+     
    // Set flag when we need to check status response
    assign check = ((t0 == 8) && (ctr == 12) && !SWDCLKOUT) ? 1'b1 : 1'b0;
    
@@ -70,7 +75,7 @@ module swd_phy
           begin
              
              // Save previous clock
-             pclk <= SWDCLKIN;
+             pclk <= qSWDCLKIN;
              
              // Check for error conditions
              if (check)
@@ -95,7 +100,7 @@ module swd_phy
              //
              // RISING edge
              //
-             if (!pclk  & SWDCLKIN)
+             if (!pclk  & qSWDCLKIN)
                begin
                   if (ctr < len)
                     SWDCLKOUT <= 1;
@@ -104,7 +109,7 @@ module swd_phy
              //
              // FALLING edge
              //
-             if (pclk & !SWDCLKIN)
+             if (pclk & !qSWDCLKIN)
                begin
 
                   // Accept new transactions
