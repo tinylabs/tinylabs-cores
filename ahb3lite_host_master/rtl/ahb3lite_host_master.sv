@@ -63,13 +63,13 @@ module ahb3lite_host_master
    state_t                        state;  // State machine
    
    // Assign busy signal
-   assign busy = ((icnt == 0) & dvalid) | (state != IDLE);
+   assign busy = (state != IDLE) || ((icnt <= 1) & dvalid);
    
    // Block while outgoing saturated
    assign block = WRFULL | (WREN & (ocnt != 0));
 
    // Always read when not busy and data is available
-   assign RDEN = ~busy & ~RDEMPTY & !block;
+   assign RDEN = !RDEMPTY & !busy & !block;
 
    // Write when data is available and not full
    assign WREN = (ocnt != 0) & !WRFULL;

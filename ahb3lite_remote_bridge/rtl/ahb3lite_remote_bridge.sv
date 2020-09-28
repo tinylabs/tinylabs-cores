@@ -101,8 +101,8 @@ module ahb3lite_remote_bridge
    logic [31:0]                 dslv_HRDATA, slv_HRDATA;
    logic                        dslv_HREADYOUT, slv_HREADYOUT;
    logic                        dslv_HRESP, slv_HRESP;
-   assign HRDATA    = EN ? slv_HRDATA : dslv_HRDATA;
-   assign HRESP     = EN ? slv_HRESP  : dslv_HRESP;
+   assign HRDATA    = EN ? slv_HRDATA    : dslv_HRDATA;
+   assign HRESP     = EN ? slv_HRESP     : dslv_HRESP;
    assign HREADYOUT = EN ? slv_HREADYOUT : dslv_HREADYOUT;
    ahb3lite_default_slave
      u_default_slave (
