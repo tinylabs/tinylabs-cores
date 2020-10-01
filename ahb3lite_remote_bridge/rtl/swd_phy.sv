@@ -53,7 +53,7 @@ module swd_phy
    // Synchronize slower clock using fast clock
    logic        qSWDCLKIN;
    sync2_pgen clk_sync (.c (CLK), .d (SWDCLKIN), .p (), .q (qSWDCLKIN));
-     
+
    // Set flag when we need to check status response
    assign check = ((t0 == 8) && (ctr == 12) && !SWDCLKOUT) ? 1'b1 : 1'b0;
    

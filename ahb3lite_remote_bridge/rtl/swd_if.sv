@@ -139,7 +139,6 @@ module swd_if
         if (!RESETn)
           begin
              state <= STATE_DISABLED;
-             READY <= 0;
           end
 
         // Main processing
@@ -162,7 +161,13 @@ module swd_if
                       READY <= 0;
                       `SWD_ENABLE (STATE_LR_FLUSH1)
                    end
-
+                 else
+                   begin
+                      READY <= 0;
+                      ERR <= 0;
+                      IDCODE <= 0;
+                   end
+               
                // IDLE state
                // Start read/write/line reset
                STATE_IDLE:
@@ -227,8 +232,9 @@ module swd_if
                     // Go back to IDLE when complete
                     if (sready & !svalid)
                       begin
-                         state <= STATE_IDLE;
-                         READY <= 1;
+                         ERR    <= err;
+                         state  <= STATE_IDLE;
+                         READY  <= 1;
                          IDCODE <= {<<{si[32:1]}};                         
                       end
                     else if (sready)

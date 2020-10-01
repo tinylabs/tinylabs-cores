@@ -161,13 +161,14 @@ module ahb3lite_remote_bridge
 
    // CTRL register
    typedef enum logic [2:0] {
-                             SUCCESS      = 0,  // No error
-                             ERR_FAULT    = 1,  // Fault (recoverable?)
-                             ERR_PARITY   = 2,  // Parity error
-                             ERR_TIMEOUT  = 3,  // Operation timed out
-                             ERR_NOMEMAP  = 4,  // No MEM-AP found
-                             ERR_UNSUPSZ  = 5,  // HWRD/BYTE not supported
-                             ERR_UNKNOWN  = 7   // Unknown error
+                             SUCCESS       = 0,  // No error
+                             ERR_FAULT     = 1,  // Fault (recoverable?)
+                             ERR_TIMEOUT   = 2,  // Operation timed out
+                             ERR_NOCONNECT = 3,  // Remote not connected
+                             ERR_PARITY    = 4,  // Parity error
+                             ERR_NOMEMAP   = 5,  // No MEM-AP found
+                             ERR_UNSUPSZ   = 6,  // HWRD/BYTE not supported
+                             ERR_UNKNOWN   = 7   // Unknown error
                              } err_t;
 
    // AHB interface
@@ -200,14 +201,12 @@ module ahb3lite_remote_bridge
    logic               if_clr;
 
    // Bridge clock generation (DIV2 - DIV512)
-   logic               clkout;
    logic               SWDCLKIN;
-   assign SWDCLKIN = clkout & if_enable;
    clkdiv u_bridge_clk (
                         .CLKIN   (CLK),
                         .RESETn  (RESETn),
                         .DIV     (CLKDIV),
-                        .CLKOUT  (clkout)
+                        .CLKOUT  (SWDCLKIN)
                         );
 
    /* Clear CTRLO bit[0] after transaction complete */
@@ -300,8 +299,9 @@ module ahb3lite_remote_bridge
                          ahb_latch_data <= 0;
                          slv_HREADYOUT <= 1;
                          IRQ <= 0;
+                         STAT <= 0;
                          `INVALIDATE_CACHE (0);
-                         `INVALIDATE_CACHE (1);                         
+                         `INVALIDATE_CACHE (1);
                       end
                  end
 
