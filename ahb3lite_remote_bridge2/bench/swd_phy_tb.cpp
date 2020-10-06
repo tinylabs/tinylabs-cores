@@ -55,8 +55,7 @@ public:
   // Helper functions
   void Enable (void);
   void Disable (void);
-  void Request (uint8_t len, uint8_t t0, uint8_t t1, uint64_t so);
-  void Flush (int cnt);
+  void SendReq (uint8_t len, uint8_t t0, uint8_t t1, uint64_t so);
   resp_t *GetResp (void);
 };
 
@@ -145,25 +144,12 @@ static uint32_t reverseBits(uint32_t n) {
   return n;
 }
 
-void swd_phy_tb::Flush (int cnt)
+void swd_phy_tb::SendReq (uint8_t len, uint8_t t0, uint8_t t1, uint64_t so)
 {
-  int i;
-  
-  for (i = 0; i < cnt; i++) {
-    
-    // Wait until response available
-    while (top->RDEMPTY)
-      doCycle ();
-
-    // Read
-    top->RDEN = 1;
+  // Block if FIFO is full
+  while (top->WRFULL)
     doCycle ();
-    top->RDEN = 0;
-  }
-}
-
-void swd_phy_tb::Request (uint8_t len, uint8_t t0, uint8_t t1, uint64_t so)
-{
+  
   // Setup data
   top->WRDATA[0] = so & 0xffffffff;
   top->WRDATA[1] = (so >> 32) & 0xffffffff;
@@ -323,19 +309,18 @@ int main (int argc, char **argv)
   dut->Enable ();
   
   // Test line reset and SWD switch sequence
-  dut->Request (60, 64, 64, 0x0fffffffffffffff);
-  dut->Request (16, 64, 64, 0xe79e);
-  dut->Request (62, 64, 64, 0x003fffffffffffff);
-  dut->Flush (3);
+  dut->SendReq (60, 64, 64, 0x0fffffffffffffff);
+  dut->SendReq (16, 64, 64, 0xe79e);
+  dut->SendReq (62, 64, 64, 0x003fffffffffffff);
   
   // Read DP IDCode
-  dut->Request (46, 8, 45, reg_read (0, 0));
+  dut->SendReq (46, 8, 45, reg_read (0, 0));
 
   // Write DP CTRL/STAT
-  dut->Request (46, 8, 12, reg_write (0, 4, 0x50000000));
+  dut->SendReq (46, 8, 12, reg_write (0, 4, 0x50000000));
 
   // Read DP CTRL/STAT
-  dut->Request (46, 8, 45, reg_read (0, 4));
+  dut->SendReq (46, 8, 45, reg_read (0, 4));
 
   // Get responses
   dump_resp (dut->GetResp ());

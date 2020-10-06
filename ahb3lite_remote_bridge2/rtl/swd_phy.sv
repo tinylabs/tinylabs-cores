@@ -1,5 +1,5 @@
 /**
- * SWD (Serial Wire Debug) PHY layer - Fully pipelined with asynch PHY_CLK
+ * SWD (Serial Wire Debug) PHY layer - Fully pipelined with async PHY_CLK
  *  domain to operate at arbitrary speeds.
  *
  * All rights reserved.
@@ -106,6 +106,7 @@ module swd_phy
              busy <= 0;
              valid <= 0;
              ctr <= 6'(OWIDTH - 1);
+             ilen <= 0;
           end
 
         // RESETn deasserted
@@ -128,8 +129,8 @@ module swd_phy
                   else
                     valid <= 0;
 
-                  // Clear wren
-                  if (ctr == (olen - 2))
+                  // Write to FIFO if data is available
+                  if ((ilen != 0) && (ctr == (olen - 2)))
                     wren <= 1;
                   else
                     wren <= 0;
