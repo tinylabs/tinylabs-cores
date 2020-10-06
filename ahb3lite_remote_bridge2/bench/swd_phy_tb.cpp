@@ -327,6 +327,20 @@ int main (int argc, char **argv)
   dump_resp (dut->GetResp ());
   dump_resp (dut->GetResp ());
 
+  // Select AP0 reg AP_IDR
+  dut->SendReq (46, 8, 12, reg_write (0, 8, 0xfc));
+
+  // Read from AP
+  dut->SendReq (46, 8, 45, reg_read (1, 0xfc & 0xc));
+
+  // Read from RDBUF cache
+  dut->SendReq (46, 8, 45, reg_read (0, 0xc));
+  
+  // Get responses
+  dump_resp (dut->GetResp ());
+  dump_resp (dut->GetResp ());
+  dump_resp (dut->GetResp ());
+
   // Disable interface
   dut->Disable ();
 
