@@ -2,9 +2,9 @@
  * SWD (Serial Wire Debug) PHY layer - Fully pipelined with async PHY_CLK
  *  domain to operate at arbitrary speeds.
  *
- * All rights reserved.
- * Tiny Labs Inc
- * 2020
+ *  All rights reserved.
+ *  Tiny Labs Inc
+ *  2020
  */
 
 module swd_phy
@@ -19,19 +19,19 @@ module swd_phy
     input                RESETn,
     input                ENABLE,
     
-    // FIFO interface in
+    // FIFO interface IN
     input [_OWIDTH-1:0]  WRDATA,
     input                WREN,
     output               WRFULL,
 
-    // FIFO interface out
+    // FIFO interface OUT
     output [_IWIDTH-1:0] RDDATA, 
     input                RDEN,
     output               RDEMPTY,
 
     // Hardware interface
-    input                SWDIN,
     output logic         SWDCLK,
+    input                SWDIN,
     output logic         SWDOUT,
     output logic         SWDOE
    );
@@ -82,7 +82,7 @@ module swd_phy
              .wr_rst_i   (~RESETn),
               // One spurious bit at the beginning and end
              .wr_data_i  ({si[IWIDTH-2:0], ilen - 6'h1}),
-             .wr_en_i    (wren),
+             .wr_en_i    (wren & !full),
              .full_o     (full),
              // Interface domain
              .rd_clk_i   (CLK),

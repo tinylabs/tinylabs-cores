@@ -21,18 +21,34 @@ filesets:
         files:
             - bench/swd_phy_tb.cpp : {file_type : cppSource}
             - rtl/swd_phy.sv : {file_type : verilogSource}
+
+    jtag_phy_sim:
+        depend:
+            - verilator_utils
+            - fifo
+        files:
+            - bench/jtag_phy_tb.cpp : {file_type : cppSource}
+            - rtl/jtag_phy.sv : {file_type : verilogSource}
             
 targets:
     default:
         filesets : [rtl]
 
-    swd_phy_sim:
-        filesets : [swd_phy_sim]
-        description: Test SWD phy with verilator
+    phy_sim: &phy_sim
         default_tool: verilator
-        toplevel: [swd_phy]
         tools:
             verilator:
                 verilator_options: [-sv, --cc, --trace, --clk, CLK]
                 run_options: [--vcd=sim.vcd, --timeout=3000]
-                
+
+    swd_phy_sim:
+        <<: *phy_sim
+        filesets : [swd_phy_sim]
+        description: Test SWD phy with verilator
+        toplevel: [swd_phy]
+
+    jtag_phy_sim:
+        <<: *phy_sim
+        filesets : [jtag_phy_sim]
+        description: Test JTAG phy with verilator
+        toplevel: [jtag_phy]
