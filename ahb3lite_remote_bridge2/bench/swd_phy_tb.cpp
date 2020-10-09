@@ -94,7 +94,7 @@ bool swd_phy_tb::_doCycle (void)
   
   // Call base function
   if (!VerilatorUtils::doCycle() || done)
-    return false;
+    exit (-1);
 
   // Control reset
   if (getTime () > RESET_TIME)

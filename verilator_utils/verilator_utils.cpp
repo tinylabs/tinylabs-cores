@@ -13,11 +13,11 @@ VerilatorUtils::VerilatorUtils(uint32_t *mem)
     vcdFileName((char *)VCD_DEFAULT_NAME),
     jtagServerEnable(false), jtagServerPort(2345),
     uartServerEnable(false), uartServerPort(7777),
-    swdClientEnable(false), swdClientPort(2345) {
+    jtagClientEnable(false), jtagClientPort(2345) {
   tfp = new VerilatedVcdC;
   jtag_server = new JTAGServer (8);
   uart_server = new UARTServer (4); // period=oversample rate
-  swd_client = new SWDClient (0);
+  jtag_client = new JTAGClient (0);
   Verilated::traceEverOn(true);
   printf("Tracing on\n");
 }
@@ -28,15 +28,15 @@ VerilatorUtils::~VerilatorUtils() {
     // Stop JTAG server
     delete jtag_server;
     delete uart_server;
-    delete swd_client;
+    delete jtag_client;
 }
 
-bool VerilatorUtils::doJTAGServer (uint8_t *tms, uint8_t *tdi, uint8_t *tck, uint8_t tdo, uint8_t swdo, uint8_t *srst) {
+bool VerilatorUtils::doJTAGServer (uint8_t *tck, uint8_t tdo, uint8_t *tdi, uint8_t *tms, uint8_t *srst) {
   uint8_t dummy;
   if (!srst)
     srst = &dummy; 
   if (jtagServerEnable)
-    jtag_server->doJTAGServer (t, tms, tdi, tck, tdo, swdo, srst);
+    jtag_server->doJTAGServer (t, tck, tdo, tdi, tms, srst);
   return true;
 }
 
@@ -47,10 +47,10 @@ bool VerilatorUtils::doUARTServer (uint8_t tx, uint8_t *rx)
   return true;
 }
 
-bool VerilatorUtils::doSWDClient (uint8_t swdclk, uint8_t swdout, uint8_t *swdin, uint8_t swdoe)
+bool VerilatorUtils::doJTAGClient (uint8_t tck, uint8_t *tdo, uint8_t tdi, uint8_t *tms, uint8_t tmsoe)
 {
-  if (swdClientEnable)
-    swd_client->doSWDClient (t, swdclk, swdout, swdin, swdoe);
+  if (jtagClientEnable)
+    jtag_client->doJTAGClient (t, tck, tdo, tdi, tms, tmsoe);
   return true;
 }
 
@@ -149,7 +149,7 @@ static struct argp_option options[] = {
   { 0, 0, 0, 0, "Remote debugging:", 3 },
   { "jtag-server", 'j', "PORT", OPTION_ARG_OPTIONAL, "Enable openocd JTAG server, opt. specify PORT" },
   { "uart-server", 'u', "PORT", OPTION_ARG_OPTIONAL, "Enable uart host server, opt. specify PORT" },
-  { "swd-client", 'r', "PORT", OPTION_ARG_OPTIONAL, "Connect to remote JTAG server opt. specify PORT" },
+  { "jtag-client", 'r', "PORT", OPTION_ARG_OPTIONAL, "Connect to remote JTAG server opt. specify PORT" },
   { 0 },
 };
 
@@ -201,10 +201,10 @@ int VerilatorUtils::parseOpts(int key, char *arg, struct argp_state *state) {
     break;
 
   case 'r':
-    utils->swdClientEnable = true;
+    utils->jtagClientEnable = true;
     if (arg)
-      utils->swdClientPort = atoi (arg);
-    utils->swd_client->Start (utils->swdClientPort);
+      utils->jtagClientPort = atoi (arg);
+    utils->jtag_client->Start (utils->jtagClientPort);
     break;
     
   default:

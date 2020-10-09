@@ -11,8 +11,8 @@
 
 #include "JTAGServer.h"
 
-int JTAGServer::doJTAGServer (uint64_t t, uint8_t *tms, uint8_t *tdi, uint8_t *tck,
-                              uint8_t tdo, uint8_t swdo,  uint8_t *srst)
+int JTAGServer::doJTAGServer (uint64_t t, uint8_t *tck, uint8_t tdo,
+                              uint8_t *tdi, uint8_t *tms, uint8_t *srst)
 {
   uint8_t cmd;
 
@@ -36,8 +36,15 @@ int JTAGServer::doJTAGServer (uint64_t t, uint8_t *tms, uint8_t *tdi, uint8_t *t
         rx.enqueue (tdo ? '1' : '0');
         break;
       case 'S': /* Optional extension for SWD support (not supported in openocd) */
-        rx.enqueue (swdo ? '1' : '0');
-        break;
+        {
+          uint8_t c = '0';
+          if (tdo)
+            c += 1;
+          if (*tms)
+            c += 2;
+          rx.enqueue (c);
+          break;
+        }
     }
   }
 

@@ -58,20 +58,26 @@ typedef enum {
 } state_t;
 
 typedef enum {
-              CMD_NOP = 0,
-              CMD_SHIFT_ONE = 1,
-              CMD_SHIFT_ZERO = 2,
-              CMD_SHIFT_DATA = 3,
+              // No responses
+              CMD_SHFT0      = 0,
+              CMD_SHFT1      = 1,
+              CMD_DATA       = 2,
+              CMD_NOP        = 3,
+              // Get response
+              CMD_SHFT0_DATA = 4,
+              CMD_SHFT1_DATA = 5,
+              CMD_SHFT_DATA  = 6,
+              CMD_COUNT      = 7,
 } cmd_t;
 
 class jtag_phy_tb : public VerilatorUtils {
 
 private:
-  Vjtag_phy *top;
   bool _doCycle (void);
   resp_t resp;
   
 public:
+  Vjtag_phy *top;
   jtag_phy_tb ();
   ~jtag_phy_tb ();
   bool doCycle (void);
@@ -118,7 +124,7 @@ bool jtag_phy_tb::_doCycle (void)
   
   // Call base function
   if (!VerilatorUtils::doCycle() || done)
-    return false;
+    exit (-1);
 
   // Control reset
   if (getTime () > RESET_TIME)
@@ -134,7 +140,7 @@ bool jtag_phy_tb::_doCycle (void)
   top->PHY_CLK = !top->PHY_CLK;
   
   // Call JTAG client function
-  doJTAGClient (top->TCK, &top->TDO, top->TDI, &top->TMS, 1);
+  doJTAGClient (top->TCK, &top->TDO, top->TDI, &top->TMS);
 
   // Continue
   return true;
@@ -168,8 +174,8 @@ void jtag_phy_tb::SendReq (state_t state, cmd_t cmd, int len, uint32_t data)
   // Setup data
   top->WRDATA = state;
   top->WRDATA |= (cmd << 4);
-  top->WRDATA |= ((len & 0x3ff) << 6);
-  top->WRDATA |= (data << 16);
+  top->WRDATA |= ((len & 0x3ff) << 7);
+  top->WRDATA |= (data << 17);
 
   // Set WriteEN
   top->WREN = 1;
@@ -194,13 +200,13 @@ resp_t *jtag_phy_tb::GetResp (void)
 
   // Save in response
   resp.len = top->RDDATA & 0x3f;
-  resp.data = (top->RDDATA >> 6) & 0xffffffff;
+  resp.data = (top->RDDATA >> (6 + 32 - resp.len)) & 0xffffffff;
   return &resp;
 }
 
 void dump_resp (resp_t *resp)
 {
-  printf ("[%d] %08X\n", resp->len, resp->data);
+  printf ("[%d] %X\n", resp->len, resp->data);
 }
 
 int main (int argc, char **argv)
@@ -209,7 +215,7 @@ int main (int argc, char **argv)
   resp_t *resp;
   
   jtag_phy_tb *dut = new jtag_phy_tb;
-  
+  uint32_t val = 0;
 
   // Parse args
   parse_args (argc, argv, dut);
@@ -220,22 +226,37 @@ int main (int argc, char **argv)
   // Run through reset
   for (i = 0; i < RESET_TIME * 2; i++)
     dut->doCycle ();
-
+  
   // Enable
   dut->Enable ();
 
   // Reset state machine
   dut->SendReq (LOGIC_RESET, CMD_NOP, 5, 0);
 
-  // Get IDCode
-  dut->SendReq (SHIFT_DR, CMD_SHIFT_ZERO, 32, 0);
+  // Get IDCODE
+  dut->SendReq (SHIFT_DR, CMD_SHFT0_DATA, 34, 0); 
+  resp = dut->GetResp ();
+  printf ("IDCode = %08X\n", resp->data);
 
-  // Get response
+  // Reset state machine
+  dut->SendReq (LOGIC_RESET, CMD_NOP, 5, 0);
+
+  // Clock out IRcode
+  dut->SendReq (SHIFT_IR, CMD_SHFT0_DATA, 6, 0);
   dump_resp (dut->GetResp ());
 
-  // Get elements in scan chain
-  // Put all elements in bypass mode
-  //dut->SendReq (SHIFT_IR, CMD_SHIFT_ONE, 1024, 0);
+  for (i = 1; i < 15; i++) {
+    
+    // Reset state machine
+    dut->SendReq (LOGIC_RESET, CMD_NOP, 5, 0);
+
+    // Write IR reg
+    dut->SendReq (SHIFT_IR, CMD_DATA, 4, i);
+
+    // Read DR
+    dut->SendReq (SHIFT_DR, CMD_SHFT0_DATA, 34, 0); 
+    dump_resp (dut->GetResp ());
+  }
   
   // Disable interface
   dut->Disable ();

@@ -6,7 +6,7 @@
 #include <verilated_vcd_c.h>
 #include "JTAGServer.h"
 #include "UARTServer.h"
-#include "SWDClient.h"
+#include "JTAGClient.h"
 
 extern struct argp verilator_utils_argp;
 
@@ -19,12 +19,12 @@ public:
 
   JTAGServer *jtag_server;
   UARTServer *uart_server;
-  SWDClient *swd_client;
+  JTAGClient *jtag_client;
   
   bool doCycle();
-  bool doJTAGServer (uint8_t *tms, uint8_t *tdi, uint8_t *tck, uint8_t tdo, uint8_t swdo=0, uint8_t *srst=NULL);
+  bool doJTAGServer (uint8_t *tck, uint8_t tdo, uint8_t *tdi, uint8_t *tms, uint8_t *srst=NULL);
   bool doUARTServer (uint8_t tx, uint8_t *rx);
-  bool doSWDClient (uint8_t swdclk, uint8_t swdout, uint8_t *swdin, uint8_t swdoe);
+  bool doJTAGClient (uint8_t tck, uint8_t *tdo, uint8_t tdi, uint8_t *tms, uint8_t tmsoe = true);
   uint64_t getTime() { return t; }
   uint64_t getTimeout() { return timeout; }
   bool getVcdDump() { return vcdDump; }
@@ -38,7 +38,6 @@ public:
 
 private:
   uint64_t t;
-
   uint64_t timeout;
 
   bool vcdDump;
@@ -51,8 +50,8 @@ private:
   int jtagServerPort;
   bool uartServerEnable;
   int uartServerPort;
-  bool swdClientEnable;
-  int swdClientPort;
+  bool jtagClientEnable;
+  int jtagClientPort;
 
   uint32_t *mem;
 

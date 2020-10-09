@@ -18,7 +18,7 @@ class JTAGServer : public Server {
  public:
   JTAGServer (uint32_t period, bool debug=0) : Server ("JTAGServer", period, debug) {}
   ~JTAGServer () {}
-  int doJTAGServer (uint64_t t, uint8_t *tms, uint8_t *tdi, uint8_t *tck, uint8_t tdo, uint8_t swdo, uint8_t *srst);
+  int doJTAGServer (uint64_t t, uint8_t *tck, uint8_t tdo, uint8_t *tdi, uint8_t *tms, uint8_t *srst);
 };
 
 #endif /* JTAGSERVER_H */

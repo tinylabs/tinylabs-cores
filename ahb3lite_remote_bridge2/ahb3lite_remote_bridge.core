@@ -39,7 +39,7 @@ targets:
         tools:
             verilator:
                 verilator_options: [-sv, --cc, --trace, --clk, CLK]
-                run_options: [--vcd=sim.vcd, --timeout=3000]
+                run_options: [--vcd=sim.vcd, --timeout=10000]
 
     swd_phy_sim:
         <<: *phy_sim
