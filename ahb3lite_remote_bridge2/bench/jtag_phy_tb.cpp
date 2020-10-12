@@ -35,7 +35,7 @@ static int parse_opt (int key, char *arg, struct argp_state *state)
 
 typedef struct {
   uint8_t  len;
-  uint32_t data;
+  uint64_t data;
 } resp_t;
 
 typedef enum {
@@ -57,19 +57,6 @@ typedef enum {
               UPDATE_IR    = 11,
 } state_t;
 
-typedef enum {
-              // No responses
-              CMD_SHFT0      = 0,
-              CMD_SHFT1      = 1,
-              CMD_DATA       = 2,
-              CMD_NOP        = 3,
-              // Get response
-              CMD_SHFT0_DATA = 4,
-              CMD_SHFT1_DATA = 5,
-              CMD_SHFT_DATA  = 6,
-              CMD_COUNT      = 7,
-} cmd_t;
-
 class jtag_phy_tb : public VerilatorUtils {
 
 private:
@@ -85,7 +72,7 @@ public:
   // Helper functions
   void Enable (void);
   void Disable (void);
-  void SendReq (state_t state, cmd_t cmd, int len, uint32_t data);
+  void SendReq (uint8_t cmd, int len, uint64_t data);
   resp_t *GetResp (void);
 };
 
@@ -165,18 +152,29 @@ void jtag_phy_tb::Disable (void)
   doCycle ();
 }
 
-void jtag_phy_tb::SendReq (state_t state, cmd_t cmd, int len, uint32_t data)
+// Valid commands
+#define CMD_DR_WRITE       0
+#define CMD_DR_READ        1
+#define CMD_DR_WRITE_AUTO  2
+#define CMD_DR_READ_AUTO   3
+#define CMD_IR_WRITE       4
+#define CMD_IR_READ        5
+#define CMD_IR_WRITE_AUTO  6
+#define CMD_IR_READ_AUTO   7
+
+void jtag_phy_tb::SendReq (uint8_t cmd, int len, uint64_t data)
 {
   // Block if FIFO is full
   while (top->WRFULL)
     doCycle ();
   
   // Setup data
-  top->WRDATA = state;
-  top->WRDATA |= (cmd << 4);
-  top->WRDATA |= ((len & 0x3ff) << 7);
-  top->WRDATA |= (data << 17);
-
+  top->WRDATA[0] = (cmd & 7);
+  top->WRDATA[0] |= ((len & 0xfff) << 3);
+  top->WRDATA[0] |= ((data & 0x7fff) << 15);  // 15bits
+  top->WRDATA[1] = (data >> 17) & 0xffffffff; // 32bits
+  top->WRDATA[2] = (data >> 47) & 0x1ffff;    // 17bits
+  
   // Set WriteEN
   top->WREN = 1;
 
@@ -199,14 +197,17 @@ resp_t *jtag_phy_tb::GetResp (void)
   top->RDEN = 0;
 
   // Save in response
-  resp.len = top->RDDATA & 0x3f;
-  resp.data = (top->RDDATA >> (6 + 32 - resp.len)) & 0xffffffff;
+  resp.len = (top->RDDATA[0] & 0x3f);
+  resp.data = (top->RDDATA[0] >> 6) | ((uint64_t)top->RDDATA[1] << 26) | (((uint64_t)top->RDDATA[2] & 0x3f) << 58);
+
+  // Left justify response
+  resp.data >>= resp.len;
   return &resp;
 }
 
 void dump_resp (resp_t *resp)
 {
-  printf ("[%d] %X\n", resp->len, resp->data);
+  printf ("[%d] %08X%08X\n", resp->len, uint32_t((resp->data >> 32) & 0xffffffff), uint32_t(resp->data & 0xffffffff));
 }
 
 int main (int argc, char **argv)
@@ -230,34 +231,22 @@ int main (int argc, char **argv)
   // Enable
   dut->Enable ();
 
-  // Reset state machine
-  dut->SendReq (LOGIC_RESET, CMD_NOP, 5, 0);
+  // Reset
+  for (i = 0; i < 5; i++)
+    dut->doCycle ();
 
-  // Get IDCODE
-  dut->SendReq (SHIFT_DR, CMD_SHFT0_DATA, 34, 0); 
+  // Send Get IDCOde IR
+  dut->SendReq (CMD_IR_WRITE, 4, 0xE);
+
+  // Read IDcode
+  dut->SendReq (CMD_DR_READ, 32, 0);
   resp = dut->GetResp ();
-  printf ("IDCode = %08X\n", resp->data);
+  printf ("IDCODE=%08X\n", (uint32_t)(resp->data & 0xffffffff));
 
-  // Reset state machine
-  dut->SendReq (LOGIC_RESET, CMD_NOP, 5, 0);
+  // Add padding to end
+  for (i = 0; i < 100; i++)
+    dut->doCycle ();
 
-  // Clock out IRcode
-  dut->SendReq (SHIFT_IR, CMD_SHFT0_DATA, 6, 0);
-  dump_resp (dut->GetResp ());
-
-  for (i = 1; i < 15; i++) {
-    
-    // Reset state machine
-    dut->SendReq (LOGIC_RESET, CMD_NOP, 5, 0);
-
-    // Write IR reg
-    dut->SendReq (SHIFT_IR, CMD_DATA, 4, i);
-
-    // Read DR
-    dut->SendReq (SHIFT_DR, CMD_SHFT0_DATA, 34, 0); 
-    dump_resp (dut->GetResp ());
-  }
-  
   // Disable interface
   dut->Disable ();
 

@@ -11,14 +11,15 @@
 `define FSM(_state, _tms) begin TMS <= _tms; state <= (_state); end
 
 module jtag_phy
-  # (parameter MAX_CLEN = 1024,  // Max total scan chain length
-     parameter BUF_SZ   = 32,    // Data bits per FIFO packet
-     // Derived
+  # (parameter MAX_CLEN = 4096,  // Max total scan chain length
+     parameter BUF_SZ   = 64,    // Data bits per FIFO packet
+     // Fixed CMD width
      parameter CMD_WIDTH = 3,
-     // DATA, CMD, LENGTH, STATE
-     parameter FIFO_IN_SZ = (BUF_SZ + CMD_WIDTH + $clog2 (MAX_CLEN) + 4),
-     // DATA, LENGTH, STATUS
-     parameter FIFO_OUT_SZ = (BUF_SZ + $clog2 (BUF_SZ) + 1)
+     // Derived
+     // DATA, LENGTH, CMD
+     parameter FIFO_IN_SZ = (BUF_SZ + CMD_WIDTH + $clog2 (MAX_CLEN)),
+     // DATA, LENGTH
+     parameter FIFO_OUT_SZ = (BUF_SZ + $clog2 (BUF_SZ))
      ) 
    (
     // Core signals
@@ -26,7 +27,7 @@ module jtag_phy
     input                    PHY_CLK,
     input                    RESETn,
     input                    ENABLE,
-    
+
     // FIFO interface IN
     input [FIFO_IN_SZ-1:0]   WRDATA,
     input                    WREN,
@@ -36,27 +37,34 @@ module jtag_phy
     output [FIFO_OUT_SZ-1:0] RDDATA,
     input                    RDEN,
     output                   RDEMPTY,
-
+    
     // Hardware interface
     output logic             TCK,
     output logic             TMS,
     output logic             TDI,
-    input                    TDO
+    input                    TDO    
     );
 
    // Command to pass PHY
-   typedef enum logic [2:0] {
-                             // No response commands
-                             CMD_SHFT0        = 0, // Shift zeros no response
-                             CMD_SHFT1        = 1, // Shift ones no response
-                             CMD_DATA         = 2, // Shift data no response
-                             CMD_NOP          = 3, // No shift operation
-                             // Commands with response
-                             CMD_SHFT0_RECV   = 4, // Shift zero get response
-                             CMD_SHFT1_RECV   = 5, // Shift one get response
-                             CMD_DATA_RECV    = 6, // Shift data onto chain
-                             CMD_COUNT        = 7  // Shift single one and count
-                             } cmd_t;
+   // 3 bit commands
+   // DR/IR | AUTO_EXTEND | CAPTURE_OUTPUT
+   // DR=0 IR=1
+   // AUTO_EXTEND = 0/1
+   //   auto-extend replicates the msb when shifting data 
+   //   into the output register.
+   // CAPTURE_OUTPUT = 0/1
+   //
+   // 0 = 000 = Write DR
+   // 1 = 001 = Read DR
+   // 2 = 010 = Write DR auto-extend
+   // 3 = 011 = Read DR auto-extend
+   // 4 = 100 = Write IR
+   // 5 = 101 = Read IR
+   // 6 = 110 = Write IR auto-extend
+   // 7 = 111 = Read IR auto-extend
+   
+   // Command and shadow
+   logic [2:0]  cmd, cmdp;
    
    // JTAG TAP state-machine
    // These states were chosen because state[2:0] represent a 
@@ -89,21 +97,18 @@ module jtag_phy
                              UPDATE_IR      = 4'b1011
                              } state_t;
 
-   // Command shifted in
-   cmd_t cmd, cmdp;
-
    // Represent current and target state
-   state_t state, nstate, nstatep;
+   state_t state, nstate;
    
    // Local FIFO interface signals
    logic                           rden, wren, empty, full;
-   logic                           valid, busy, done;
+   logic                           dvalid, busy;
 
    // Data in/out
    logic [BUF_SZ-1:0]              din, dout, doutp;
    logic [$clog2(MAX_CLEN)-1:0]    olen, olenp, ctr;
-   logic [$clog2(BUF_SZ):0]        ilen;
-
+   logic [$clog2(BUF_SZ)-1:0]      ilen;
+   
    
    // FIFO interfaces with layer above
    dual_clock_fifo #(.ADDR_WIDTH (2),
@@ -120,7 +125,7 @@ module jtag_phy
              .rd_clk_i   (PHY_CLK),
              .rd_rst_i   (~RESETn),
              .rd_en_i    (rden),
-             .rd_data_o  ({doutp, olenp, cmdp, nstatep}),
+             .rd_data_o  ({doutp, olenp, cmdp}),
              .empty_o    (empty)
              );
    dual_clock_fifo #(.ADDR_WIDTH (2),
@@ -136,24 +141,24 @@ module jtag_phy
               // PHY interface
               .wr_clk_i   (PHY_CLK),
               .wr_rst_i   (~RESETn),
-              .wr_en_i    (wren & !full),
+              .wr_en_i    (wren),
               .wr_data_i  ({din, ilen}),
               .full_o     (full)
              );
    
-   // Read when data ready and not busy
-   assign rden = !empty & !valid;
+   // Read when data ready and in IDLE or reset
+   assign rden = !empty & !busy;
    
    always @(posedge PHY_CLK, negedge PHY_CLK)
      if (!RESETn | !ENABLE)
        begin
-          busy <= 0;
           TCK <= 0;
-          TMS <= 0;
           TDI <= 0;
-          state <= RUNTEST_IDLE;
-          nstate <= RUNTEST_IDLE;
-          olen <= 0;
+          TMS <= 1;
+          state  <= LOGIC_RESET;
+          nstate <= LOGIC_RESET;
+          // Internal vars
+          busy <= 0;
        end
      else // Not in RESET
        begin
@@ -161,118 +166,107 @@ module jtag_phy
           // Negative edge of phy clk
           if (!PHY_CLK)
             begin
-               
-               // Toggle postive edge
-               if ((ctr <= olen) | (state != nstate))
-                 TCK <= 1;
+
+               // Toggle clock while enabled
+               TCK <= 1;
+
+               // Clear write enable
+               if (wren)
+                 wren <= 0;
                     
-               // Sample TDO on rising edge
-               if ((ctr < olen) && (state == nstate))
+               // If reading back data
+               if (cmd[0])
                  begin
-                                        
-                    // Start sampling when counter is > 0
-                    if (ctr > 0)
+                    
+                    // Shift in on SHIFT-XX
+                    if (state[2:0] == 3'b010)
                       begin
-                         
-                         // Count until we see one
-                         if (cmd == CMD_COUNT)
-                           begin
-                              // Terminate early when we see '1'
-                              if (TDO)
-                                begin
-                                   ilen <= BUF_SZ;
-                                   ctr <= olen - 2;
-                                end
-                              // Count zeros
-                              else
-                                din <= din + 1;
-                           end
-                         // Clock in TDO
-                         else if (cmd[2] != 0)
-                           din <= {TDO, din[BUF_SZ-1:1]};
-                         
-                      end // if (ctr > 0)
+                         din <= {TDO, din[BUF_SZ-1:1]};
+                         ilen <= ilen + 1;
+                      end
 
-                 end // if (state == nstate)
+                    // Check if we are done
+                    if (ctr == olen - 1)
+                      begin
+                         wren <= 1;
+                         cmd <= 0;
+                         ilen <= ilen;
+                      end
 
+                 end // if (cmd[0])               
+               
             end // if (PHY_CLK)
           
           // Positive edge of PHY_CLK - setup data
           else
             begin
-            
-               // Toggle negative CLK edge
-               if ((ctr <= olen) | (state != nstate))
-                 TCK <= 0;
 
-               // Data valid next cycle after READ
-               if (rden)
-                 valid <= 1;
-               
-               // Copy to blocking regs
-               if (valid & !busy)
+               // Toggle clock while enabled
+               TCK <= 0;
+
+               // Shift out bits if in capture-XX state or EXIT1-XX state
+               if ((state[2:0] == 3'b010) || (state[2:0] == 3'b101))
                  begin
-                    olen <= olenp;
-                    nstate <= nstatep;
-                    ilen <= 0;
-                    din <= 0;
-                    cmd <= cmdp;
-                    busy <= 1;
-                    valid <= 0;
-                    done <= 0;
+
+                    // Drive TDI
+                    TDI <= dout[0];
                     
-                    // Operate on command
-                    casez (cmdp)
-                      3'b?00:    TDI <= 0;                  // Shift zero
-                      3'b?01:    TDI <= 1;                  // Shift one
-                      3'b?10:    TDI <= doutp[0];            // Shift data
-                      CMD_NOP:   TDI <= 0;                  // Do nothing
-                      CMD_COUNT: TDI <= 1; // Shift 100000...
-                    endcase // case (cmd)
-
-                    if (cmdp[1:0] == 2'b10)
-                      dout <= {1'b0, doutp[BUF_SZ-1:1]};
-                    else                    
-                      dout <= doutp;
-                 end
-
-               // Drive TDI on negative edge
-               if ((ctr < olen) && (state == nstate))
-                 begin
-                                        
-                    // Shift data once we are in correct state
-                    if (cmd[1:0] == 2'b10)
+                    // Auto-extend if enabled
+                    dout <= cmd[1] ? {dout[BUF_SZ-1], dout[BUF_SZ-1:1]} : {1'b0, dout[BUF_SZ-1:1]};
+               
+                    // TODO - Move to Pause state if we run out
+                    // of input data
+                    
+                    // TODO - Clr busy when out of data
+                    if (ctr < olen)
                       begin
-                         dout <= {1'b0, dout[BUF_SZ-1:1]};
-                         TDI <= dout[0];
+                         
+                         // Increment counter
+                         ctr <= ctr + 1;
                       end
-                 end
+                    
+                    // Transition out two cycles early
+                    if (ctr == olen - 2)
+                      begin
+                         // Move back to IDLE when done
+                         nstate <= RUNTEST_IDLE;
+                         busy <= 0;
+                      end
 
-               // Reset counter
-               if (state != nstate)
-                 ctr <= 0;
-               else if (ctr < olen)
-                 ctr <= ctr + 1;
-
-               // Write response back
-               if (done)
+                 end // if ((state[2:0] == 3'b010) || (state[2:0] == 3'b101))
+               
+               //
+               // Latch in new command to shadow regs
+               //
+               if (rden)
                  begin
-                    wren <= cmd[2] ? 1 : 0;
-                    done <= 0;
+                    dvalid <= 1;
+                    busy <= 1;
                  end
-               else
-                 wren <= 0;            
-
-               // Trigger done
-               if (ctr == (olen - 2))
+                     
+               // If data is valid then latch into operating regs
+               if (dvalid)
                  begin
-                    busy <= 0;
-                    done <= 1;
-                    olen <= 0;
-                    ilen <= ctr[$clog2(BUF_SZ):0];
-                    nstate <= RUNTEST_IDLE;
-                 end
+                    cmd <= cmdp;
+                    olen <= cmdp[0] ? olenp + 1 : olenp;
+                    dout <= doutp;
+                    dvalid <= 0;
 
+                    // Reset counter
+                    ctr <= 0;
+                    
+                    // Move to RESET
+                    if (olenp == 0)
+                      nstate <= LOGIC_RESET;
+                    // Move to SHIFT-IR
+                    else if (cmdp[2])
+                      nstate <= SHIFT_IR;
+                    // Move to SHIFT-DR
+                    else
+                      nstate <= SHIFT_DR;
+                 end // if (dvalid)
+               
+               
                //
                // JTAG state machine
                //
