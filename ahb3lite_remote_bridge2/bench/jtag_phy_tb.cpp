@@ -171,9 +171,9 @@ void jtag_phy_tb::SendReq (uint8_t cmd, int len, uint64_t data)
   // Setup data
   top->WRDATA[0] = (cmd & 7);
   top->WRDATA[0] |= ((len & 0xfff) << 3);
-  top->WRDATA[0] |= ((data & 0x7fff) << 15);  // 15bits
+  top->WRDATA[0] |= ((data & 0x1ffff) << 15); // 17bits
   top->WRDATA[1] = (data >> 17) & 0xffffffff; // 32bits
-  top->WRDATA[2] = (data >> 47) & 0x1ffff;    // 17bits
+  top->WRDATA[2] = (data >> 49) & 0x7fff;     // 15bits
   
   // Set WriteEN
   top->WREN = 1;
@@ -231,11 +231,11 @@ int main (int argc, char **argv)
   // Enable
   dut->Enable ();
 
-  // Reset
+  // Make sure we're in reset
   for (i = 0; i < 5; i++)
     dut->doCycle ();
 
-  // Send Get IDCOde IR
+  // Send IDCOde IR
   dut->SendReq (CMD_IR_WRITE, 4, 0xE);
 
   // Read IDcode
@@ -243,6 +243,16 @@ int main (int argc, char **argv)
   resp = dut->GetResp ();
   printf ("IDCODE=%08X\n", (uint32_t)(resp->data & 0xffffffff));
 
+  // Put chain in bypass
+  dut->SendReq (CMD_IR_WRITE_AUTO, 4095, -1);
+
+  // Write zero to chain
+  dut->SendReq (CMD_DR_WRITE_AUTO, 4095, 0);
+
+  // Write one then zero
+  dut->SendReq (CMD_DR_READ, 4094, 1);
+  dut->GetResp ();
+  
   // Add padding to end
   for (i = 0; i < 100; i++)
     dut->doCycle ();

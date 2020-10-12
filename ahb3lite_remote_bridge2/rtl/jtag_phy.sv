@@ -251,9 +251,12 @@ module jtag_phy
                     olen <= cmdp[0] ? olenp + 1 : olenp;
                     dout <= doutp;
                     dvalid <= 0;
-
+                    
                     // Reset counter
                     ctr <= 0;
+
+                    // Clear din
+                    din <= 0;
                     
                     // Move to RESET
                     if (olenp == 0)
