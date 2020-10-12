@@ -198,16 +198,45 @@ resp_t *jtag_phy_tb::GetResp (void)
 
   // Save in response
   resp.len = (top->RDDATA[0] & 0x3f);
+  if (resp.len == 0)
+    resp.len = 64;
   resp.data = (top->RDDATA[0] >> 6) | ((uint64_t)top->RDDATA[1] << 26) | (((uint64_t)top->RDDATA[2] & 0x3f) << 58);
 
-  // Left justify response
-  resp.data >>= resp.len;
+  // Right justify response
+  resp.data >>= (64 - resp.len);
   return &resp;
 }
 
 void dump_resp (resp_t *resp)
 {
   printf ("[%d] %08X%08X\n", resp->len, uint32_t((resp->data >> 32) & 0xffffffff), uint32_t(resp->data & 0xffffffff));
+}
+
+int device_count (jtag_phy_tb *dut)
+{
+  int i;
+  uint64_t dr[64];
+  
+  // Put chain in bypass
+  dut->SendReq (CMD_IR_WRITE_AUTO, 128, -1);
+  
+  // Write zero to chain
+  dut->SendReq (CMD_DR_WRITE_AUTO, 64, 0);
+
+  // Write one then zero
+  dut->SendReq (CMD_DR_READ, 64, 1);
+    
+  // Get responses
+  for (i = 0; i < 1; i++)
+    dr[i] = dut->GetResp ()->data;
+  
+  // Check length
+  for (i = 0; i < 64; i++)
+    if (dr[i>>6] & (1 << (i & 0x3f)))
+      break;
+
+  // Return scan chain length
+  return (i == 64) ? -1 : i;
 }
 
 int main (int argc, char **argv)
@@ -235,6 +264,9 @@ int main (int argc, char **argv)
   for (i = 0; i < 5; i++)
     dut->doCycle ();
 
+  // Get device count
+  printf ("Device count = %d\n", device_count (dut));
+  
   // Send IDCOde IR
   dut->SendReq (CMD_IR_WRITE, 4, 0xE);
 
@@ -243,16 +275,6 @@ int main (int argc, char **argv)
   resp = dut->GetResp ();
   printf ("IDCODE=%08X\n", (uint32_t)(resp->data & 0xffffffff));
 
-  // Put chain in bypass
-  dut->SendReq (CMD_IR_WRITE_AUTO, 4095, -1);
-
-  // Write zero to chain
-  dut->SendReq (CMD_DR_WRITE_AUTO, 4095, 0);
-
-  // Write one then zero
-  dut->SendReq (CMD_DR_READ, 4094, 1);
-  dut->GetResp ();
-  
   // Add padding to end
   for (i = 0; i < 100; i++)
     dut->doCycle ();

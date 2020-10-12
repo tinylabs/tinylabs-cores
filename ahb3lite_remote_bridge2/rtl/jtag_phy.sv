@@ -107,7 +107,7 @@ module jtag_phy
    // Data in/out
    logic [BUF_SZ-1:0]              din, dout, doutp;
    logic [$clog2(MAX_CLEN)-1:0]    olen, olenp, ctr;
-   logic [$clog2(BUF_SZ)-1:0]      ilen;
+   logic [$clog2(BUF_SZ)-1:0]      ilen, ileno;
    
    
    // FIFO interfaces with layer above
@@ -142,7 +142,7 @@ module jtag_phy
               .wr_clk_i   (PHY_CLK),
               .wr_rst_i   (~RESETn),
               .wr_en_i    (wren),
-              .wr_data_i  ({din, ilen}),
+              .wr_data_i  ({din, ileno}),
               .full_o     (full)
              );
    
@@ -186,11 +186,10 @@ module jtag_phy
                       end
 
                     // Check if we are done
-                    if (ctr == olen - 1)
+                    if ((ctr == olen - 1) || ((ctr != 0) && (ilen == 0)))
                       begin
                          wren <= 1;
-                         cmd <= 0;
-                         ilen <= ilen;
+                         ileno <= ilen;
                       end
 
                  end // if (cmd[0])               
@@ -216,14 +215,12 @@ module jtag_phy
                
                     // TODO - Move to Pause state if we run out
                     // of input data
-                    
                     // TODO - Clr busy when out of data
+                    
                     if (ctr < olen)
-                      begin
-                         
+
                          // Increment counter
                          ctr <= ctr + 1;
-                      end
                     
                     // Transition out two cycles early
                     if (ctr == olen - 2)
@@ -255,7 +252,8 @@ module jtag_phy
                     // Reset counter
                     ctr <= 0;
 
-                    // Clear din
+                    // Clear ilen
+                    ilen <= 0;
                     din <= 0;
                     
                     // Move to RESET
