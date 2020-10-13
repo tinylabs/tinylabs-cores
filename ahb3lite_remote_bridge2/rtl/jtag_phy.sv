@@ -187,16 +187,21 @@ module jtag_phy
                          // Shift in on SHIFT-XX
                          din <= {TDO, din[BUF_SZ-1:1]};
                          ilen <= ilen + 1;
-                         
+                                
                          // Check if we are done
-                         if ((ctr == olen - 1) || ((olen > BUF_SZ) && (ilen == 6'(BUF_SZ - 1))))
+                         if (!full && 
+                             ((ctr == olen - 1) || 
+                              ((olen > BUF_SZ) && (ilen == 6'(BUF_SZ - 1)))))
                            wren <= 1;
-                         
+                  
                       end // if ((state == pstate) && (state[2:0] == 3'b010) || (state[2:0] == 3'b101))
 
                     // Clear write enable
                     if (wren)
                       wren <= 0;
+                    // Coming out of pause flush (resp_blocked)
+                    else if (!full && resp_blocked && (ilen == 0))
+                      wren <= 1;
 
                  end // if (cmd[0])
                
@@ -236,17 +241,18 @@ module jtag_phy
                     
                     // Enter pause state
                     // No room for response
-                    if (full & cmd[0])
+                    if (cmd[0] & full &
+                        ((olen > BUF_SZ) && (ilen == 6'(BUF_SZ - 3))))
                       begin
                          // Set flag
                          resp_blocked <= 1;
                       end
 
                     // Do we need more data to send?
-                    else if (!cmd[1] &
-                             (ctr != 0) & 
-                             ((olen  - ctr) > BUF_SZ) &
-                             ((ctr % BUF_SZ) == (BUF_SZ - 3)))
+                    if (!cmd[1] &
+                        (ctr != 0) & 
+                        ((olen  - ctr) > BUF_SZ) &
+                        ((ctr % BUF_SZ) == (BUF_SZ - 3)))
                       begin
 
                          // Nothing available - Enter pause state
