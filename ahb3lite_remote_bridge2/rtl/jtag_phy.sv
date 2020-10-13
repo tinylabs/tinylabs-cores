@@ -98,16 +98,19 @@ module jtag_phy
                              } state_t;
 
    // Represent current and target state
-   state_t state, nstate;
+   state_t      state, nstate, pstate;
+
+   // Blocking FIFO state
+   logic        resp_blocked, req_blocked;
    
    // Local FIFO interface signals
-   logic                           rden, wren, empty, full;
-   logic                           dvalid, busy;
-
+   logic        rden, wren, empty, full;
+   logic        dvalid, busy, pending;
+   
    // Data in/out
-   logic [BUF_SZ-1:0]              din, dout, doutp;
-   logic [$clog2(MAX_CLEN)-1:0]    olen, olenp, ctr;
-   logic [$clog2(BUF_SZ)-1:0]      ilen, ileno;
+   logic [BUF_SZ-1:0]           din, dout, doutp;
+   logic [$clog2(MAX_CLEN)-1:0] olen, olenp, ctr;
+   logic [$clog2(BUF_SZ)-1:0]   ilen;
    
    
    // FIFO interfaces with layer above
@@ -142,12 +145,12 @@ module jtag_phy
               .wr_clk_i   (PHY_CLK),
               .wr_rst_i   (~RESETn),
               .wr_en_i    (wren),
-              .wr_data_i  ({din, ileno}),
+              .wr_data_i  ({din, ilen}),
               .full_o     (full)
              );
    
    // Read when data ready and in IDLE or reset
-   assign rden = !empty & !busy;
+   assign rden = !empty & !dvalid & !busy;
    
    always @(posedge PHY_CLK, negedge PHY_CLK)
      if (!RESETn | !ENABLE)
@@ -159,6 +162,9 @@ module jtag_phy
           nstate <= LOGIC_RESET;
           // Internal vars
           busy <= 0;
+          resp_blocked <= 0;
+          req_blocked <= 0;
+          pending <= 0;
        end
      else // Not in RESET
        begin
@@ -170,29 +176,29 @@ module jtag_phy
                // Toggle clock while enabled
                TCK <= 1;
 
-               // Clear write enable
-               if (wren)
-                 wren <= 0;
-                    
-               // If reading back data
+               // Read mode
                if (cmd[0])
                  begin
                     
-                    // Shift in on SHIFT-XX
-                    if (state[2:0] == 3'b010)
+                    // If reading back data
+                    if ((state == pstate) && (state[2:0] == 3'b010) || (state[2:0] == 3'b101))
                       begin
+                         
+                         // Shift in on SHIFT-XX
                          din <= {TDO, din[BUF_SZ-1:1]};
                          ilen <= ilen + 1;
-                      end
+                         
+                         // Check if we are done
+                         if ((ctr == olen - 1) || ((olen > BUF_SZ) && (ilen == 6'(BUF_SZ - 1))))
+                           wren <= 1;
+                         
+                      end // if ((state == pstate) && (state[2:0] == 3'b010) || (state[2:0] == 3'b101))
 
-                    // Check if we are done
-                    if ((ctr == olen - 1) || ((ctr != 0) && (ilen == 0)))
-                      begin
-                         wren <= 1;
-                         ileno <= ilen;
-                      end
+                    // Clear write enable
+                    if (wren)
+                      wren <= 0;
 
-                 end // if (cmd[0])               
+                 end // if (cmd[0])
                
             end // if (PHY_CLK)
           
@@ -203,34 +209,84 @@ module jtag_phy
                // Toggle clock while enabled
                TCK <= 0;
 
-               // Shift out bits if in capture-XX state or EXIT1-XX state
-               if ((state[2:0] == 3'b010) || (state[2:0] == 3'b101))
+               // Move to PAUSE-XX
+               if (req_blocked || resp_blocked)
+                 nstate[2:0] <= 3'b110;
+
+               // Return from pause state
+               if (state[2:0] == 3'b110)
                  begin
+                    // If req blocked then clear busy for next read
+                    if (req_blocked)                      
+                      busy <= 0;
+                    
+                    if (!full & resp_blocked)
+                      resp_blocked <= 0;
+                    if (req_blocked & dvalid)
+                      req_blocked <= 0;
 
-                    // Drive TDI
-                    TDI <= dout[0];
+                    // If both are unblocked return to SHIFT-XX
+                    if (!req_blocked & !resp_blocked)
+                      nstate[2:0] <= 3'b010;
+                 end
+
+               // Shift out bits if in capture-XX state or EXIT1-XX state
+               if (state[2:0] == 3'b010)
+                 begin
                     
-                    // Auto-extend if enabled
-                    dout <= cmd[1] ? {dout[BUF_SZ-1], dout[BUF_SZ-1:1]} : {1'b0, dout[BUF_SZ-1:1]};
-               
-                    // TODO - Move to Pause state if we run out
-                    // of input data
-                    // TODO - Clr busy when out of data
+                    // Enter pause state
+                    // No room for response
+                    if (full & cmd[0])
+                      begin
+                         // Set flag
+                         resp_blocked <= 1;
+                      end
+
+                    // Do we need more data to send?
+                    else if (!cmd[1] &
+                             (ctr != 0) & 
+                             ((olen  - ctr) > BUF_SZ) &
+                             ((ctr % BUF_SZ) == (BUF_SZ - 3)))
+                      begin
+
+                         // Nothing available - Enter pause state
+                         if (empty)
+                              // Set flag
+                              req_blocked <= 1;
+                         else
+                           // Unblock for next transaction
+                           busy <= 0;
+                      end // if (!cmd[1] &...
                     
+                    // Write data out
                     if (ctr < olen)
-
+                      begin
+                         
+                         // Drive TDI
+                         TDI <= dout[0];
+                    
+                         // Auto-extend if enabled
+                         dout <= cmd[1] ? {dout[BUF_SZ-1], dout[BUF_SZ-1:1]} : {1'b0, dout[BUF_SZ-1:1]};
+                         
                          // Increment counter
                          ctr <= ctr + 1;
-                    
+                         
+                      end // if ((ctr < olen) && !full)
+                    // Clear TDI
+                    else
+                      TDI <= 0;
+
                     // Transition out two cycles early
                     if (ctr == olen - 2)
                       begin
                          // Move back to IDLE when done
                          nstate <= RUNTEST_IDLE;
                          busy <= 0;
+                         pending <= 0;
                       end
 
-                 end // if ((state[2:0] == 3'b010) || (state[2:0] == 3'b101))
+                 end // if (state[2:0] == 3'b010)
+               
                
                //
                // Latch in new command to shadow regs
@@ -238,35 +294,46 @@ module jtag_phy
                if (rden)
                  begin
                     dvalid <= 1;
-                    busy <= 1;
                  end
                      
                // If data is valid then latch into operating regs
-               if (dvalid)
+               if (dvalid & !busy)
                  begin
                     cmd <= cmdp;
                     olen <= cmdp[0] ? olenp + 1 : olenp;
                     dout <= doutp;
                     dvalid <= 0;
+                    busy <= 1;
                     
-                    // Reset counter
-                    ctr <= 0;
+                    // Reset ctr, etc on new transaction
+                    if (!pending)
+                      begin
 
-                    // Clear ilen
-                    ilen <= 0;
-                    din <= 0;
+                         // Set to pending
+                         pending <= 1;
+                         
+                         // Reset counter
+                         ctr <= 0;
+
+                         // Clear ilen
+                         ilen <= 0;
+                         din <= 0;
                     
-                    // Move to RESET
-                    if (olenp == 0)
-                      nstate <= LOGIC_RESET;
-                    // Move to SHIFT-IR
-                    else if (cmdp[2])
-                      nstate <= SHIFT_IR;
-                    // Move to SHIFT-DR
-                    else
-                      nstate <= SHIFT_DR;
-                 end // if (dvalid)
-               
+                         // Move to RESET
+                         if (olenp == 0)
+                           nstate <= LOGIC_RESET;
+                         // Move to SHIFT-IR
+                         else if (cmdp[2])
+                           nstate <= SHIFT_IR;
+                         // Move to SHIFT-DR
+                         else
+                           nstate <= SHIFT_DR;
+                      end // if (state[2:0] == 3'b000)
+                    
+                 end // if (dvalid & !busy)
+
+               // Save previous state
+               pstate <= state;
                
                //
                // JTAG state machine
