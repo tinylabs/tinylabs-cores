@@ -298,8 +298,7 @@ module jtag_phy
                       end
 
                  end // if (state[2:0] == 3'b010)
-               
-               
+
                //
                // Latch in new command to shadow regs
                //
@@ -315,15 +314,14 @@ module jtag_phy
                     olen <= cmdp[0] ? olenp + 1 : olenp;
                     dout <= doutp;
                     dvalid <= 0;
-                    // Set to busy if not reset
-                    busy <= (olenp != 0) ? 1 : 0;
+                    busy <= 1;
                     
                     // Reset ctr, etc on new transaction
                     if (!pending)
                       begin
 
                          // Set to pending if not reset
-                         pending <= (olenp != 0) ? 1 : 0;
+                         pending <= 1;
                          
                          // Reset counter
                          ctr <= 0;
@@ -348,54 +346,100 @@ module jtag_phy
                // Save previous state
                pstate <= state;
                
-               //
-               // JTAG state machine
-               //
-               // Based on 3bit LFSR with some added logic for
-               // alternate transitions.
-               //
-               // TMS on negative transition
-               // State change on positve
-               //
-               
-               // LOGIC_RESET/RUNTEST_IDLE
-               if (state[2:0] == 3'b000) begin
-                  if (nstate != state)
-                    `FSM (|state ? RUNTEST_IDLE : SELECT_DR, ~TMS)
-               end
-               
-               // Handle SELECT_DR -> SELECT_IR
-               else if ((state == SELECT_DR) & nstate[3])
-                 `FSM ({1'b1, state[2:0]}, TMS)
-               
-               // Handle SELECT_IR -> LOGIC_RESET
-               else if ((state == SELECT_IR) && (nstate[2:0] == 3'b000))
-                 `FSM (LOGIC_RESET, 1)
-               
-               // Handle skip of shift-IR/DR
-               else if ((state[2:0] == 3'b100) && (nstate[2:0] != 3'b010))
-                 `FSM ({state[3], 3'b101}, 1)
-               
-               // Handle transition from EXIT2-xx to SHIFT-xx
-               else if ((state[2:0] == 3'b111) && (state[3] == nstate[3]) && 
-                        (nstate[2:0] == 3'b010))
-                 `FSM ({state[3], 3'b010}, 0)
+
+               // Handle RESET/SWD -> JTAG switching
+               // Override state machine
+               if ((olen == 0) & pending)
+                 begin
+                         
+                    // Sequence TMS on counter
+                    case (ctr[6:0])
+                      7'd0:  TMS <= 1; // 50+ TMS=1
+                      7'd8: if (cmd == 3'b000) TMS <= 0;
+                      7'd9: if (cmd == 3'b000) // Handle normal RESET
+                        begin
+                           state <= RUNTEST_IDLE;
+                           nstate <= RUNTEST_IDLE;
+                           pending <= 0;
+                           busy <= 0;
+                        end
+                      7'd60: TMS <= 0; // 2 TMS=0
+                      7'd62: TMS <= 1; // 4 TMS=1
+                      7'd66: TMS <= 0; // 2 TMS=0
+                      7'd68: TMS <= 1; // 3 TMS=1
+                      7'd71: TMS <= 0; // 2 TMS=0
+                      7'd73: TMS <= 1; // 5+ TMS=1
+                      7'd85: TMS <= 0; // Return to IDLE
+                      7'd86: begin
+                         pending <= 0;
+                         busy <= 0;
+                         state <= RUNTEST_IDLE;
+                         nstate <= RUNTEST_IDLE;
+                      end
+                      default: ;
+                    endcase // case (ctr[6:0])
                     
-               // Handle UPDATE-xx transition
-               else if ((state[2:0] == 3'b011) && (nstate == RUNTEST_IDLE))
-                 `FSM (RUNTEST_IDLE, 0)
+                    // Increment counter
+                    ctr <= ctr + 1;
+                    
+                    // Force state
+                    if (ctr == 0)
+                      state <= LOGIC_RESET;
+                 end
                
-               // Handle EXIT1->UPDATE
-               else if ((state[2:0] == 3'b101) && (nstate[2:0] != 3'b110))
-                 `FSM ({state[3], 3'b011}, 1)
-               
-               // Handle SHIFT_DR/IR PAUSE_DR/IR loops
-               else if ((state[1:0] == 2'b10) && (state == nstate))
-                 ; // Do nothing
-               
-               // Drive state machine with LFSR (TMS = state[1])
                else
-                 `FSM ({state[2:0] == 3'b011 ? 1'b0 : state[3], ^state[1:0], state[2:1]}, state[1])
+                 begin
+                    
+                    //
+                    // JTAG state machine
+                    //
+                    // Based on 3bit LFSR with some added logic for
+                    // alternate transitions.
+                    //
+                    // TMS on negative transition
+                    // State change on positve
+                    //
+                    
+                    // LOGIC_RESET/RUNTEST_IDLE
+                    if (state[2:0] == 3'b000) begin
+                       if (nstate != state)
+                         `FSM (|state ? RUNTEST_IDLE : SELECT_DR, ~TMS)
+                    end
+                    
+                    // Handle SELECT_DR -> SELECT_IR
+                    else if ((state == SELECT_DR) & nstate[3])
+                      `FSM ({1'b1, state[2:0]}, TMS)
+               
+                    // Handle SELECT_IR -> LOGIC_RESET
+                    else if ((state == SELECT_IR) && (nstate[2:0] == 3'b000))
+                      `FSM (LOGIC_RESET, 1)
+                    
+                    // Handle skip of shift-IR/DR
+                    else if ((state[2:0] == 3'b100) && (nstate[2:0] != 3'b010))
+                      `FSM ({state[3], 3'b101}, 1)
+                    
+                    // Handle transition from EXIT2-xx to SHIFT-xx
+                    else if ((state[2:0] == 3'b111) && (state[3] == nstate[3]) && 
+                             (nstate[2:0] == 3'b010))
+                      `FSM ({state[3], 3'b010}, 0)
+                    
+                    // Handle UPDATE-xx transition
+                    else if ((state[2:0] == 3'b011) && (nstate == RUNTEST_IDLE))
+                      `FSM (RUNTEST_IDLE, 0)
+                    
+                    // Handle EXIT1->UPDATE
+                    else if ((state[2:0] == 3'b101) && (nstate[2:0] != 3'b110))
+                      `FSM ({state[3], 3'b011}, 1)
+                    
+                    // Handle SHIFT_DR/IR PAUSE_DR/IR loops
+                    else if ((state[1:0] == 2'b10) && (state == nstate))
+                      ; // Do nothing
+                    
+                    // Drive state machine with LFSR (TMS = state[1])
+                    else
+                      `FSM ({state[2:0] == 3'b011 ? 1'b0 : state[3], ^state[1:0], state[2:1]}, state[1])
+               
+                 end // else: !if(state[2:0] == 3'b000)
 
             end // else: !if(PHY_CLK)
           

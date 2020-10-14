@@ -386,10 +386,12 @@ int main (int argc, char **argv)
   // Enable
   dut->Enable ();
 
-  // Make sure we're in reset
-  for (i = 0; i < 5; i++)
-    dut->doCycle ();
+  // Send reset
+  dut->SendReq (CMD_DR_WRITE, 0, 0);
 
+  // SWD->JTAG switch
+  dut->SendReq (CMD_IR_WRITE, 0, 0);
+  
   // Get IRlen
   printf ("Total ir_len = %d\n", ir_len (dut, false)); // No stall
   printf ("Total ir_len = %d\n", ir_len (dut, true));  // stall
@@ -397,17 +399,12 @@ int main (int argc, char **argv)
   // Get device count
   printf ("Device count = %d\n", device_count (dut, false));
   printf ("Device count = %d\n", device_count (dut, true));
-
+    
   // Send reset
-  dut->SendReq (CMD_IR_WRITE, 0, 0);
-  for (i = 0; i < 5; i++)
-    dut->doCycle ();
-  
-  // Send IDCOde IR
-  //dut->SendReq (CMD_IR_WRITE, 4, 0xE);
-  dut->SendReq (CMD_DR_READ, 32, 0);
- 
+  dut->SendReq (CMD_DR_WRITE, 0, 0);
+
   // Read IDCODE
+  dut->SendReq (CMD_DR_READ, 32, 0);
   printf ("IDCODE=%08X\n", (uint32_t)dut->GetResp()->data);
 
   // Power up debug/AP
