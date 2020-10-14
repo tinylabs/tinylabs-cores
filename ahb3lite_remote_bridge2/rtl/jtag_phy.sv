@@ -111,7 +111,11 @@ module jtag_phy
    logic [BUF_SZ-1:0]           din, dout, doutp;
    logic [$clog2(MAX_CLEN)-1:0] olen, olenp, ctr;
    logic [$clog2(BUF_SZ)-1:0]   ilen;
-   
+
+   logic                        gate_tck;
+
+   // Gate TCK when IDLE - save power
+   assign gate_tck = ((state == RUNTEST_IDLE) && (nstate == RUNTEST_IDLE));
    
    // FIFO interfaces with layer above
    dual_clock_fifo #(.ADDR_WIDTH (2),
@@ -174,7 +178,8 @@ module jtag_phy
             begin
 
                // Toggle clock while enabled
-               TCK <= 1;
+               if (!gate_tck)
+                 TCK <= 1;
 
                // Read mode
                if (cmd[0])
@@ -224,7 +229,8 @@ module jtag_phy
                     // If req blocked then clear busy for next read
                     if (req_blocked)                      
                       busy <= 0;
-                    
+
+                    // Release blocked when OK
                     if (!full & resp_blocked)
                       resp_blocked <= 0;
                     if (req_blocked & dvalid)
@@ -309,14 +315,15 @@ module jtag_phy
                     olen <= cmdp[0] ? olenp + 1 : olenp;
                     dout <= doutp;
                     dvalid <= 0;
-                    busy <= 1;
+                    // Set to busy if not reset
+                    busy <= (olenp != 0) ? 1 : 0;
                     
                     // Reset ctr, etc on new transaction
                     if (!pending)
                       begin
 
-                         // Set to pending
-                         pending <= 1;
+                         // Set to pending if not reset
+                         pending <= (olenp != 0) ? 1 : 0;
                          
                          // Reset counter
                          ctr <= 0;

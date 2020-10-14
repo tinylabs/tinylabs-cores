@@ -74,6 +74,12 @@ public:
   void Disable (void);
   void SendReq (uint8_t cmd, int len, uint64_t data);
   resp_t *GetResp (void);
+
+  // DP/AP access
+  void dp_write (uint8_t addr, uint32_t data);
+  uint32_t dp_read (uint8_t addr);
+  void ap_write (uint8_t ap, uint8_t addr, uint32_t data);
+  uint32_t ap_read (uint8_t ap, uint8_t addr);  
 };
 
 static int parse_args (int argc, char **argv, jtag_phy_tb *tb)
@@ -231,7 +237,6 @@ int device_count (jtag_phy_tb *dut, bool stall)
 
   // Send rest
   for (i = 0; i < (MAX_IR_LEN/64) - 1; i++)
-    //dut->SendReq (CMD_DR_READ, MAX_IR_LEN, 0x5555555555555555);
     dut->SendReq (CMD_DR_READ, MAX_IR_LEN, 0xdeadbeefdeadbeef);
 
   // Get first response
@@ -299,10 +304,71 @@ int ir_len (jtag_phy_tb *dut, bool stall)
   return (i == 128) ? -1 : i - 64 + 1;
 }
 
+
+void jtag_phy_tb::dp_write (uint8_t addr, uint32_t data)
+{
+  // Load DPACC
+  SendReq (CMD_IR_WRITE, 4, 0xA);
+
+  // Send write request
+  SendReq (CMD_DR_WRITE, 35, ((uint64_t)data) << 3 | ((addr >> 1) & 6));
+
+  // Debug
+  //printf ("DP[%X] = %08X\n", addr, data);
+}
+
+uint32_t jtag_phy_tb::dp_read (uint8_t addr)
+{
+  resp_t *resp;
+  
+  // Load DPACC
+  SendReq (CMD_IR_WRITE, 4, 0xA);
+
+  // Send read request
+  SendReq (CMD_DR_READ, 35, ((addr >> 1) & 6) | 1);
+
+  // Get resp
+  resp = GetResp ();
+  //dump_resp (resp);
+  if ((resp->data & 3) != 2)
+    printf ("RESP ERR: %d\n", (int)(resp->data & 3));
+
+  //printf ("DP[%X] = %08X\n", addr, (uint32_t)((resp->data >> 3) & 0xffffffff));
+  return (resp->data >> 3) & 0xffffffff;
+}
+
+void jtag_phy_tb::ap_write (uint8_t ap, uint8_t addr, uint32_t data)
+{
+  // Write to DP-select
+  dp_write (8, addr | (ap << 24));
+
+  // Select APACC
+  SendReq (CMD_IR_WRITE, 4, 0xB);
+
+  // Read AP register
+  SendReq (CMD_DR_WRITE, 35, (data << 3) | ((addr >> 1) & 6));
+}
+
+uint32_t jtag_phy_tb::ap_read (uint8_t ap, uint8_t addr)
+{
+  // Write to DP-select
+  dp_write (8, addr | (ap << 24));
+
+  // Select APACC
+  SendReq (CMD_IR_WRITE, 4, 0xB);
+
+  // Read AP register
+  SendReq (CMD_DR_WRITE, 35, ((addr >> 1) & 6) | 1);
+
+  // Read RDBUFF
+  return dp_read (0xc);
+}
+
 int main (int argc, char **argv)
 {
   int i;
   resp_t *resp;
+  uint32_t data;
   
   jtag_phy_tb *dut = new jtag_phy_tb;
   uint32_t val = 0;
@@ -328,25 +394,54 @@ int main (int argc, char **argv)
   printf ("Total ir_len = %d\n", ir_len (dut, false)); // No stall
   printf ("Total ir_len = %d\n", ir_len (dut, true));  // stall
 
-  // Send IDCOde IR
-  dut->SendReq (CMD_IR_WRITE, 4, 0xE);
-
-  // Read IDcode
-  dut->SendReq (CMD_DR_READ, 32, 0);
-  resp = dut->GetResp ();
-  printf ("IDCODE=%08X\n", (uint32_t)(resp->data & 0xffffffff));
-  
   // Get device count
   printf ("Device count = %d\n", device_count (dut, false));
   printf ("Device count = %d\n", device_count (dut, true));
 
+  // Send reset
+  dut->SendReq (CMD_IR_WRITE, 0, 0);
+  for (i = 0; i < 5; i++)
+    dut->doCycle ();
+  
+  // Send IDCOde IR
+  //dut->SendReq (CMD_IR_WRITE, 4, 0xE);
+  dut->SendReq (CMD_DR_READ, 32, 0);
+ 
+  // Read IDCODE
+  printf ("IDCODE=%08X\n", (uint32_t)dut->GetResp()->data);
+
+  // Power up debug/AP
+  dut->dp_write (4, 0x50000000);
+  printf ("CTRL/STAT=%08X\n", dut->dp_read (4));
+  for (i = 0; i < 100; i++)
+    dut->doCycle ();
+  
+  // Read APIDR
+  printf ("AP[0]=%08X\n", dut->ap_read (0, 0xfc));
+
+  // Base register
+  printf ("BASE=%08X\n", dut->ap_read (0, 0xf8));
+
+  // READ CSW
+  printf ("CSW=%08X\n", dut->ap_read (0, 0x0));
+  printf ("Halting processor... ");
+  
+  // Write CSW
+  dut->ap_write (0, 0, 0xA2000002);
+  //printf ("CSW=%08X\n", dut->ap_read (0, 0x0));
+
+  // Write SCB_DHCSR to TAR
+  dut->ap_write (0, 4, 0xE000EDF0);
+
+  // Halt processor
+  do {
+    dut->ap_write (0, 0xc, 0xA05F0003);
+    data = dut->ap_read (0, 0xc);
+    //printf ("DHCSR=%08X\n", data);
+  } while ((data & (1 << 17)) == 0);
+  printf ("Processor HALTED\n");
+  
   /*
-  // Load DPACC
-  dut->SendReq (CMD_IR_WRITE, 4, 0xA);
-
-  // Read 35 bits
-  dut->SendReq (CMD_DR_WRITE, 35, 1);
-
   // Add padding to end
   for (i = 0; i < 400; i++)
     dut->doCycle ();
