@@ -13,6 +13,8 @@
 module jtag_phy
   # (parameter MAX_CLEN = 4096,  // Max total scan chain length
      parameter BUF_SZ   = 64,    // Data bits per FIFO packet
+     // FIFO width
+     parameter FIFO_AW = 2,
      // Fixed CMD width
      parameter CMD_WIDTH = 3,
      // Derived
@@ -118,8 +120,8 @@ module jtag_phy
    assign gate_tck = ((state == RUNTEST_IDLE) && (nstate == RUNTEST_IDLE));
    
    // FIFO interfaces with layer above
-   dual_clock_fifo #(.ADDR_WIDTH (2),
-                     .DATA_WIDTH  (FIFO_IN_SZ))
+   dual_clock_fifo #(.ADDR_WIDTH (FIFO_AW),
+                     .DATA_WIDTH (FIFO_IN_SZ))
    u_phy_in (
              // Host interface
              .wr_clk_i   (CLK),
@@ -135,8 +137,8 @@ module jtag_phy
              .rd_data_o  ({doutp, olenp, cmdp}),
              .empty_o    (empty)
              );
-   dual_clock_fifo #(.ADDR_WIDTH (2),
-                     .DATA_WIDTH  (FIFO_OUT_SZ))
+   dual_clock_fifo #(.ADDR_WIDTH (FIFO_AW),
+                     .DATA_WIDTH (FIFO_OUT_SZ))
    u_phy_out (
               // Host interface
               .rd_clk_i   (CLK),
