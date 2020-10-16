@@ -345,7 +345,7 @@ void jtag_phy_tb::ap_write (uint8_t ap, uint8_t addr, uint32_t data)
   // Select APACC
   SendReq (CMD_IR_WRITE, 4, 0xB);
 
-  // Read AP register
+  // Write AP register
   SendReq (CMD_DR_WRITE, 35, (data << 3) | ((addr >> 1) & 6));
 }
 
