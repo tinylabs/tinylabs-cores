@@ -8,47 +8,65 @@ filesets:
             - ahb3lite_pkg
             - fifo
         files:
-            - rtl/ahb3lite_remote_bridge.sv
-            - rtl/clkdiv.sv
-            - rtl/swd_if.sv
+#            - rtl/ahb3lite_remote_bridge.sv
+#            - rtl/clkdiv.sv
+#            - rtl/swd_if.sv
             - rtl/swd_phy.sv
+            - rtl/jtag_adiv5.sv
+            - rtl/jtag_phy.sv
         file_type : verilogSource
 
-    swd_phy_sim:
+    swd_phy:
         depend:
             - verilator_utils
             - fifo
         files:
-            - bench/swd_phy_tb.cpp : {file_type : cppSource}
             - rtl/swd_phy.sv : {file_type : verilogSource}
+            - bench/swd_phy_tb.cpp : {file_type : cppSource}
 
-    jtag_phy_sim:
+    jtag_phy:
         depend:
             - verilator_utils
             - fifo
-        files:
-            - bench/jtag_phy_tb.cpp : {file_type : cppSource}
-            - rtl/jtag_phy.sv : {file_type : verilogSource}
+        files: 
+           - rtl/jtag_phy.sv : {file_type : verilogSource}
+           - bench/jtag_phy_tb.cpp : {file_type : cppSource}
+            
+    jtag_adiv5:
+        depend:
+            - verilator_utils
+            - fifo
+        files: 
+           - rtl/jtag_phy.sv : {file_type : verilogSource}
+           - rtl/jtag_adiv5.sv : {file_type : verilogSource}
+           - bench/jtag_adiv5_tb.cpp : {file_type : cppSource}
             
 targets:
     default:
         filesets : [rtl]
 
-    phy_sim: &phy_sim
+    sim: &sim
         default_tool: verilator
         tools:
             verilator:
                 verilator_options: [-sv, --cc, --trace, --clk, CLK]
                 run_options: [--vcd=sim.vcd, --timeout=20000]
-
-    swd_phy_sim:
-        <<: *phy_sim
-        filesets : [swd_phy_sim]
+                
+    swd_phy:
+        <<: *sim
+        filesets : [swd_phy]
         description: Test SWD phy with verilator
         toplevel: [swd_phy]
 
-    jtag_phy_sim:
-        <<: *phy_sim
-        filesets : [jtag_phy_sim]
+    jtag_phy:
+        <<: *sim
+        filesets : [jtag_phy]
         description: Test JTAG phy with verilator
         toplevel: [jtag_phy]
+
+    jtag_adiv5:
+        <<: *sim
+        filesets : [jtag_adiv5]
+        description: ADIv5 interface layer test
+        toplevel: [jtag_adiv5]
+        
