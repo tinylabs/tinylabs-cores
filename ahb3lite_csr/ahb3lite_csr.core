@@ -16,6 +16,6 @@ targets:
 
 generators:
     ahb3lite_csr_gen:
-        interpreter: python
+        interpreter: python3
         command: sw/ahb3lite_csr.py
         description: Generate AHB3lite CSR slave
