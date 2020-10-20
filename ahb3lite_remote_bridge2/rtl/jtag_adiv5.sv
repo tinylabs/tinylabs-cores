@@ -168,17 +168,14 @@ module jtag_adiv5 # ( parameter FIFO_AW = 2 )
    assign phy_rden = !phy_empty;
 
    // State machine
-   typedef enum logic [3:0] {
-                             IDLE = 0,
-                             CMD,
-                             IDCODE,
-                             DPWRITE,
-                             DPREAD,
-                             APSEL,
-                             APIRSEL,
-                             APACCESS,
-                             APBUF,
-                             RESPONSE
+   typedef enum logic [2:0] {
+                             IDLE     = 0,
+                             CMD      = 1,
+                             IDCODE   = 2,
+                             DPWRITE  = 3,
+                             DPREAD   = 4,
+                             APACCESS = 5,
+                             RESPONSE = 6
                              } state_t;
    state_t state;
    
@@ -231,22 +228,21 @@ module jtag_adiv5 # ( parameter FIFO_AW = 2 )
               begin
                  // Execute command
                  casez ({addr[2:0], APnDP, RnW})
-                   5'b00001: `PHY_CMD (IDCODE, `CMD_RESET, 0, 35'h0, 0)   // Emulated DP[0] read
-                   5'b00101, 5'b01001, 5'b01101: `PHY_CMD (DPREAD, `CMD_IR_WRITE, 4, `IR_DPACC, 0)  // DPREAD
-                   5'b0??00: `PHY_CMD (DPWRITE, `CMD_IR_WRITE, 4, `IR_DPACC, 0) // DPWRITE
-                   5'b???11: `PHY_CMD (DPWRITE, `CMD_IR_WRITE, 4, `IR_DPACC, 0) // APREAD
-                   5'b???10: `PHY_CMD (DPWRITE, `CMD_IR_WRITE, 4, `IR_DPACC, 0) // APWRITE
                    default:  state <= IDLE;
-                   5'b10000: begin // DP[0x14]
+                   5'b0?101: `PHY_CMD (DPREAD, `CMD_IR_WRITE, 4, `IR_DPACC, 0)   // READ DP[4/C]
+                   5'b01001: `PHY_CMD (DPREAD, `CMD_IR_WRITE, 4, `IR_DPACC, 0)   // READ DP[8]
+                   5'b0??00: `PHY_CMD (DPWRITE, `CMD_IR_WRITE, 4, `IR_DPACC, 0)  // WRITE DP[0/4/8/C]
+                   5'b???11: `PHY_CMD (APACCESS, `CMD_IR_WRITE, 4, `IR_APACC, 0) // READ AP
+                   5'b???10: `PHY_CMD (APACCESS, `CMD_IR_WRITE, 4, `IR_APACC, 0) // WRITE AP
+                   // Pseudo DP registers
+                   // DP[0]    read - emulate IDCODE found on SWD interface
+                   // DP[0x10] write - Handle RESET/line switch
+                   5'b00001: `PHY_CMD (IDCODE, `CMD_RESET, 0, 35'h0, 0)   // Emulated DP[0] read
+                   5'b10000: begin // DP[0x10] - Add reset/switch to pseudo DP-reg
                       if (dato[0])
                         `PHY_CMD (IDLE, `CMD_SWITCH, 0, 35'h0, 1)    
                       else
                         `PHY_CMD (IDLE, `CMD_RESET, 0, 35'h0, 1)
-                   end
-                   5'b10100: begin  // DP[0x14]
-                      apsel <= dato[7:0];
-                      state <= IDLE;
-                      busy <= 0;
                    end
                  endcase // casez ({addr[2:0], APnDP, RnW})
               end
@@ -255,19 +251,14 @@ module jtag_adiv5 # ( parameter FIFO_AW = 2 )
             IDCODE:   `PHY_CMD (RESPONSE, `CMD_DR_READ, 32, 35'h0, 0)
 
             // DP write
-            DPWRITE:  `PHY_CMD (APnDP ? APSEL : IDLE, `CMD_DR_WRITE, 35, {dato, addr[1:0], 1'b0}, APnDP ? 0 : 1)
+            DPWRITE:  `PHY_CMD (IDLE, `CMD_DR_WRITE, 35, {dato, addr[1:0], 1'b0}, 1)
             
             // DP read
             DPREAD:   `PHY_CMD (RESPONSE, `CMD_DR_READ, 35, {32'h0, addr[1:0], 1'b1}, 1)
-            
-            // AP write   Write DP-SELECT, set APACC, Write AP
-            APSEL:    `PHY_CMD (APIRSEL, `CMD_DR_WRITE, 35, {apsel, 16'h0, addr, 2'h0, addr[1:0], 1'b0}, 0)
-            APIRSEL:  `PHY_CMD (APACCESS, `CMD_IR_WRITE, 4, `IR_APACC, 0)
-            APACCESS: `PHY_CMD (RnW ? APBUF : IDLE, `CMD_DR_WRITE, 35, {dato, addr[1:0], RnW ? 1'b1 : 1'b0}, RnW ? 0 : 1) 
-            
-            // Read results from DP-RDBUFF
-            APBUF:    `PHY_CMD (RESPONSE, `CMD_DR_READ, 35, {32'h0, addr[1:0], 1'b1}, 0)
-            
+
+            // AP read
+            APACCESS: `PHY_CMD (IDLE, `CMD_DR_WRITE, 35, {dato, addr[1:0], RnW}, 1)
+                        
             // Return response to client
             RESPONSE:
               if (phy_dvalid) 
