@@ -346,8 +346,7 @@ module jtag_phy
                  end // if (dvalid & !busy)
 
                // Save previous state
-               pstate <= state;
-               
+               pstate <= state;               
 
                // Handle RESET/SWD -> JTAG switching
                // Override state machine

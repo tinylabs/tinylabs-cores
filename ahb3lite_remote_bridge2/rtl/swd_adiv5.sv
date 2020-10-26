@@ -165,7 +165,8 @@ module swd_adiv5 # ( parameter FIFO_AW = 2 )
                              SWITCH   = 2,
                              RESET2   = 3,
                              FLUSH    = 4,
-                             RESPONSE = 5
+                             RESPONSE = 5,
+                             IGNORE   = 6
                              } state_t;
    state_t state;
    
@@ -246,17 +247,17 @@ module swd_adiv5 # ( parameter FIFO_AW = 2 )
             RESPONSE:
               if (phy_dvalid) 
                 begin
-
-                   // If past retries or response != WAIT return
-                   // TODO: Clear FAULT error
-                   if ((retries > `RETRY_MAX) || (phy_resp == 3'b100))
+                   
+                   // Retries exceeded - Issue ABORT
+                   if (retries == `RETRY_MAX)
+                     `PHY_RAW (IGNORE, 46, 8, 12, 64'h20000003EA1, 1) 
+                   // Response OK and parity OK on READ
+                   else if ((phy_resp == 3'b100) && ((^phy_dati[32:1] == phy_dati[0]) | ~RnW))
                      begin
                         // Copy data/status
                         dati <= {<<{phy_dati[32:1]}};
                         stat <= phy_resp;
                    
-                        // Check parity @ phy_dati[0]
-                        // Check length
                         // Write to FIFO, return to IDLE
                         state <= IDLE;
                         wren <= 1;
@@ -269,7 +270,18 @@ module swd_adiv5 # ( parameter FIFO_AW = 2 )
                      end
                    
                 end // if (phy_dvalid)
-            
+
+            // Recover from ABORT - return to IDLE
+            IGNORE:
+              if (phy_dvalid)
+                begin
+                   state <= IDLE;
+                   stat <= 3'b001; // Return FAULT
+                   dati <= 0;
+                   wren <= 1;
+                   busy <= 0;
+                end
+                    
           endcase // case (state)               
           
        end // else: !if(~RESETn)
