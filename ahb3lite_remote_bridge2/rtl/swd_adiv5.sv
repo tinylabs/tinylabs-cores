@@ -1,5 +1,5 @@
 /**
- *  ARM ADIv5.2 debug interface for JTAG - Converts common FIFO interface to JTAG commands
+ *  ARM ADIv5.2 debug interface for SWD - Converts common FIFO interface to SWD commands
  *
  *  Commands are passed via a FIFO. Input commands have the following format:
  *  [39:0] = DATA[31:0], ADDR[5:0], APnDP, RnW
@@ -16,44 +16,32 @@
 localparam CMD_WIDTH = 40;
 localparam RESP_WIDTH = 35;
 
-`define PHY_CMD(_state, _cmd, _len, _dat, _done)  begin   \
-   if (phy_wren) begin                                    \
-      phy_wren <= 0;                                      \
-      state <= _state;                                    \
-      if (_done) busy <= 0;                               \
-   end                                                    \
-   else if (!phy_full) begin                              \
-      phy_cmd <= _cmd;                                    \
-      phy_olen <= _len;                                   \
-      phy_dato <= {{29{1'b0}}, _dat};                     \
-      phy_wren <= 1;                                      \
+`define PHY_RAW(_state, _len, _t0, _t1, _dat, _done)  begin  \
+   if (phy_wren) begin                                       \
+      phy_wren <= 0;                                         \
+      state <= _state;                                       \
+      if (_done) busy <= 0;                                  \
+   end                                                       \
+   else if (!phy_full) begin                                 \
+      phy_olen <= _len;                                      \
+      phy_t0 <= _t0;                                         \
+      phy_t1 <= _t1;                                         \
+      phy_dato <= _dat;                                      \
+      phy_wren <= 1;                                         \
    end end
 
+`define PHY_READ(_state, _done)  `PHY_RAW(_state, 46, 8, 45, {21'h0, phy_cmd}, _done)
+`define PHY_WRITE(_state, _done) `PHY_RAW(_state, 46, 8, 12, {21'h0, phy_cmd}, _done)
+ 
 `define PHY_RSP(_state) begin                  \
    if (phy_dvalid) begin                       \
       state <= _state;                         \
    end end
        
-// PHY commands
-`define CMD_RESET          3'b000
-`define CMD_SWITCH         3'b100
-`define CMD_DR_WRITE       3'b000
-`define CMD_DR_READ        3'b001
-`define CMD_DR_WRITE_AUTO  3'b010
-`define CMD_DR_READ_AUTO   3'b011
-`define CMD_IR_WRITE       3'b100
-`define CMD_IR_READ        3'b101
-`define CMD_IR_WRITE_AUTO  3'b110
-`define CMD_IR_READ_AUTO   3'b111
-
-// IR registers
-`define IR_DPACC  35'hA
-`define IR_APACC  35'hB
-
 // Max number of retries
 `define RETRY_MAX  5'h31
 
-module jtag_adiv5 # ( parameter FIFO_AW = 2 )
+module swd_adiv5 # ( parameter FIFO_AW = 2 )
    (
     // Core signals
     input                   CLK,
@@ -71,11 +59,11 @@ module jtag_adiv5 # ( parameter FIFO_AW = 2 )
     input                   RDEN,
     output                  RDEMPTY,
 
-    // JTAG signals
+    // SWD signals
     output                  TCK,
-    output                  TMS,
-    output                  TDI,
-    input                   TDO
+    output                  TMSOUT,
+    input                   TMSIN,
+    output                  TMSOE
     );
 
    // Command logic
@@ -122,14 +110,19 @@ module jtag_adiv5 # ( parameter FIFO_AW = 2 )
                );
 
    // Phy logic
-   logic [63:0]             phy_dato, phy_dati;
-   logic [11:0]             phy_olen;
-   logic [5:0]              phy_ilen;
-   logic [2:0]              phy_cmd;
+   logic [63:0]             phy_dato;
+   logic [36:0]             phy_dati;
+   logic [5:0]              phy_olen, phy_ilen;
+   logic [5:0]              phy_t0, phy_t1;
    logic                    phy_wren, phy_rden, phy_empty, phy_full, phy_dvalid;
+   logic [42:0]             phy_cmd;
+   logic [2:0]              phy_resp;
+   
+   //               turn, dparity, data, turn, park, stop, cmd parity,               addr[1:0], RnW, APnDP, start
+   assign phy_cmd = {1'b0, ^dato, dato, 1'b0, 1'b1, 1'b0, ^{addr[1:0], RnW, APnDP}, addr[1:0], RnW, APnDP, 1'b1};
    
    // Underlying PHY
-   jtag_phy u_phy
+   swd_phy u_phy
      (
       .CLK      (CLK),
       .PHY_CLK  (PHY_CLK),
@@ -137,7 +130,7 @@ module jtag_adiv5 # ( parameter FIFO_AW = 2 )
       .ENABLE   (ENABLE),
 
       // FIFO in
-      .WRDATA  ({phy_dato, phy_olen, phy_cmd}),
+      .WRDATA  ({phy_olen, phy_t0, phy_t1, phy_dato}),
       .WREN    (phy_wren),
       .WRFULL  (phy_full),
       
@@ -146,35 +139,33 @@ module jtag_adiv5 # ( parameter FIFO_AW = 2 )
       .RDEN    (phy_rden),
       .RDEMPTY (phy_empty),
 
-      // JTAG signals
-      .TCK     (TCK),
-      .TMS     (TMS),
-      .TDI     (TDI),
-      .TDO     (TDO)
+      // SWD signals
+      .SWDCLK  (TCK),
+      .SWDIN   (TMSIN),
+      .SWDOUT  (TMSOUT),
+      .SWDOE   (TMSOE)
       );
 
    // AP selected
    logic [4:0]              retries;
-   logic                    idcode;
 
-   // Are we responding to IDCODE
-   assign idcode = ((phy_cmd == `CMD_DR_READ) && (addr == 0) && !APnDP);
-   
    // Combinatorial logic
    assign rden = !empty & !busy;
 
    // Read PHY as soon as available
    assign phy_rden = !phy_empty;
 
+   // Response from phy
+   assign phy_resp = RnW ? phy_dati[35:33] : phy_dati[2:0];
+   
    // State machine
    typedef enum logic [2:0] {
                              IDLE     = 0,
                              CMD      = 1,
-                             IDCODE   = 2,
-                             DPWRITE  = 3,
-                             DPREAD   = 4,
-                             APACCESS = 5,
-                             RESPONSE = 6
+                             SWITCH   = 2,
+                             RESET2   = 3,
+                             FLUSH    = 4,
+                             RESPONSE = 5
                              } state_t;
    state_t state;
    
@@ -228,58 +219,48 @@ module jtag_adiv5 # ( parameter FIFO_AW = 2 )
                  // Execute command
                  casez ({addr[2:0], APnDP, RnW})
                    default:  state <= IDLE;
-                   5'b0?101: `PHY_CMD (DPREAD, `CMD_IR_WRITE, 4, `IR_DPACC, 0)   // READ DP[4/C]
-                   5'b01001: `PHY_CMD (DPREAD, `CMD_IR_WRITE, 4, `IR_DPACC, 0)   // READ DP[8]
-                   5'b0??00: `PHY_CMD (DPWRITE, `CMD_IR_WRITE, 4, `IR_DPACC, 0)  // WRITE DP[0/4/8/C]
-                   5'b???11: `PHY_CMD (APACCESS, `CMD_IR_WRITE, 4, `IR_APACC, 0) // READ AP
-                   5'b???10: `PHY_CMD (APACCESS, `CMD_IR_WRITE, 4, `IR_APACC, 0) // WRITE AP
+                   5'b0???1: `PHY_READ (RESPONSE, 1)  // READ
+                   5'b0??10: `PHY_WRITE (FLUSH, 0)    // AP WRITE
+                   5'b0??00: `PHY_WRITE (RESPONSE, 1) // DP WRITE
                    // Pseudo DP registers
-                   // DP[0]    read - emulate IDCODE found on SWD interface
-                   // DP[0x10] write - Handle RESET/line switch
-                   5'b00001: `PHY_CMD (IDCODE, `CMD_RESET, 0, 35'h0, 0)
+                   // DP[0x10] write - Handle RESET/protocol switch
                    5'b10000: begin
                       if (dato[0])
-                        `PHY_CMD (IDLE, `CMD_SWITCH, 0, 35'h0, 1)    
+                        `PHY_RAW (SWITCH, 60, 63, 63, {64{1'b1}}, 0)
                       else
-                        `PHY_CMD (IDLE, `CMD_RESET, 0, 35'h0, 1)
+                        `PHY_RAW (IDLE, 60, 63, 63, {64{1'b1}}, 1)
                    end
                  endcase // casez ({addr[2:0], APnDP, RnW})
               end
-            
-            // Read IDCODE
-            IDCODE:   `PHY_CMD (RESPONSE, `CMD_DR_READ, 32, 35'h0, 0)
 
-            // DP write
-            DPWRITE:  `PHY_CMD (IDLE, `CMD_DR_WRITE, 35, {dato, addr[1:0], 1'b0}, 1)
-            
-            // DP read
-            DPREAD:   `PHY_CMD (RESPONSE, `CMD_DR_READ, 35, {32'h0, addr[1:0], 1'b1}, 1)
+            // Switch to SWD
+            SWITCH:  `PHY_RAW (RESET2, 16, 63, 63, {48'h0, 16'he79e}, 0)
 
-            // AP read
-            APACCESS: `PHY_CMD (IDLE, `CMD_DR_WRITE, 35, {dato, addr[1:0], RnW}, 1)
-                        
+            // Do additional line reset
+            RESET2:  `PHY_RAW (IDLE, 62, 63, 63, {10'h0, {54{1'b1}}}, 1)
+
+            // Flush after AP write
+            FLUSH:   `PHY_RAW (RESPONSE, 8, 63, 63, 64'h0, 1)
+            
             // Return response to client
             RESPONSE:
               if (phy_dvalid) 
                 begin
 
-                   // Anything but 010 is an ERROR
-                   if (idcode || (phy_dati[31:29] == 3'b010))
-                     stat <= 3'b100;
-                   else
-                     stat <= phy_dati[31:29];
-
                    // If past retries or response != WAIT return
                    // TODO: Clear FAULT error
-                   if (idcode || (retries > `RETRY_MAX) || (phy_dati[31:29] == 3'b010))
+                   if ((retries > `RETRY_MAX) || (phy_resp == 3'b100))
                      begin
-                       // Copy data back
-                       dati <= phy_dati[63:32];
-                       
+                        // Copy data/status
+                        dati <= {<<{phy_dati[32:1]}};
+                        stat <= phy_resp;
+                   
+                        // Check parity @ phy_dati[0]
+                        // Check length
                         // Write to FIFO, return to IDLE
-                       state <= IDLE;
-                       wren <= 1;
-                       busy <= 0;
+                        state <= IDLE;
+                        wren <= 1;
+                        busy <= 0;
                      end
                    else 
                      begin // Retry transaction                        
@@ -293,4 +274,4 @@ module jtag_adiv5 # ( parameter FIFO_AW = 2 )
           
        end // else: !if(~RESETn)
    
-endmodule; // jtag_adiv5
+endmodule; // swd_adiv5

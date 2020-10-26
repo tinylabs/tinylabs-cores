@@ -138,6 +138,7 @@ module swd_phy
                   // Latch into working variables when valid
                   if (valid)
                     begin
+                       //$display ("len=%d t0=%d t1=%d so=%X", lenp, t0p, t1p, sop);
                        olen <= lenp;
                        t0 <= t0p - 1;
                        t1 <= t1p - 1;

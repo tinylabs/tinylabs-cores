@@ -10,10 +10,9 @@ filesets:
         files:
 #            - rtl/ahb3lite_remote_bridge.sv
 #            - rtl/clkdiv.sv
-#            - rtl/swd_if.sv
             - rtl/swd_phy.sv
-            - rtl/jtag_adiv5.sv
             - rtl/jtag_phy.sv
+            - rtl/jtag_adiv5.sv
         file_type : verilogSource
 
     swd_phy:
@@ -24,6 +23,15 @@ filesets:
             - rtl/swd_phy.sv : {file_type : verilogSource}
             - bench/swd_phy_tb.cpp : {file_type : cppSource}
 
+    swd_adiv5:
+        depend:
+            - verilator_utils
+            - fifo
+        files: 
+           - rtl/swd_phy.sv : {file_type : verilogSource}
+           - rtl/swd_adiv5.sv : {file_type : verilogSource}
+           - bench/swd_adiv5_tb.cpp : {file_type : cppSource}
+            
     jtag_phy:
         depend:
             - verilator_utils
@@ -57,6 +65,12 @@ targets:
         filesets : [swd_phy]
         description: Test SWD phy with verilator
         toplevel: [swd_phy]
+
+    swd_adiv5:
+        <<: *sim
+        filesets : [swd_adiv5]
+        description: ADIv5 interface layer test
+        toplevel: [swd_adiv5]
 
     jtag_phy:
         <<: *sim

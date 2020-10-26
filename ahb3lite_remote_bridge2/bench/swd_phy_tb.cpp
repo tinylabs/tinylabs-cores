@@ -227,6 +227,8 @@ uint64_t reg_write (bool APnDP, uint8_t addr, uint32_t data)
   // Park [7]
   v |= (1 << 7);
 
+  // Turnaround [8]
+  
   // Data [40:9]
   v |= ((uint64_t)data << 9);
   
