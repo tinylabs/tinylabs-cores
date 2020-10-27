@@ -212,7 +212,7 @@ uint32_t jtag_adiv5_tb::ap_read (uint8_t apsel, uint8_t addr)
   
   // Read AP[addr]
   write ((addr >> 2) & 3, 1, 1, 0);
-  
+
   // Get result
   return read ();
 }

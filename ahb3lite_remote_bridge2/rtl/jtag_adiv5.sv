@@ -157,7 +157,8 @@ module jtag_adiv5 # ( parameter FIFO_AW = 2 )
    // AP selected
    logic [4:0]              retries;
    logic                    idcode;
-
+   logic [3:0]              ir;   // IR cache
+              
    // Are we responding to IDCODE
    assign idcode = ((phy_cmd == `CMD_DR_READ) && (addr == 0) && !APnDP);
    
@@ -170,18 +171,20 @@ module jtag_adiv5 # ( parameter FIFO_AW = 2 )
    // State machine
    typedef enum logic [3:0] {
                              IDLE       = 0,
-                             CMD        = 1,
-                             IDCODE     = 2,
-                             DPWRITE    = 3,
-                             DPREAD     = 4,
-                             APACCESS   = 5,
-                             FLUSH      = 6,
-                             CHECK      = 7,
-                             RESPONSE   = 8,
-                             ABORT_IR   = 9,
-                             ABORT      = 10,
-                             ABORT_DONE = 11,
-                             RESET_DONE = 12
+                             SET_IR     = 1,
+                             SAVE_IR    = 2,
+                             CMD        = 3,
+                             IDCODE     = 4,
+                             DPWRITE    = 5,
+                             DPREAD     = 6,
+                             APACCESS   = 7,
+                             FLUSH      = 8,
+                             CHECK      = 9,
+                             RESPONSE   = 10,
+                             ABORT_IR   = 11,
+                             ABORT      = 12,
+                             ABORT_DONE = 13,
+                             RESET_DONE = 14
                              } state_t;
    state_t state;
    
@@ -193,6 +196,7 @@ module jtag_adiv5 # ( parameter FIFO_AW = 2 )
           state <= IDLE;
           dvalid <= 0;
           phy_dvalid <= 0;
+          ir <= 4'hf;
        end
      else
        begin
@@ -224,9 +228,31 @@ module jtag_adiv5 # ( parameter FIFO_AW = 2 )
                  // Latch in command
                  if (dvalid)
                    begin
-                      state <= CMD;
+                      casez ({addr, APnDP, RnW})
+                        default:  state <= SET_IR;
+                        4'b0001, 4'b1100: state <= CMD;
+                      endcase // casez ({addr, APnDP, RnW})
                       dvalid <= 0;
                    end
+              end
+
+            // Set IR
+            SET_IR:
+              begin
+                 // Set IR if not same as cache
+                 if (APnDP && (ir != 4'hB))
+                   `PHY_CMD (SAVE_IR, `CMD_IR_WRITE, 4, `IR_APACC)
+                 else if (!APnDP && (ir != 4'hA))
+                   `PHY_CMD (SAVE_IR, `CMD_IR_WRITE, 4, `IR_DPACC)
+                 else
+                   state <= CMD;
+              end
+
+            // Save IR and process cmd
+            SAVE_IR:
+              begin
+                 ir <= APnDP ? 4'hB : 4'hA;
+                 state <= CMD;
               end
             
             // Process command
@@ -235,11 +261,11 @@ module jtag_adiv5 # ( parameter FIFO_AW = 2 )
                  // Execute command
                  casez ({addr, APnDP, RnW})
                    default:  state <= IDLE;
-                   4'b0101: `PHY_CMD (DPREAD, `CMD_IR_WRITE, 4, `IR_DPACC)   // READ DP[4]
-                   4'b1?01: `PHY_CMD (DPREAD, `CMD_IR_WRITE, 4, `IR_DPACC)   // READ DP[8/C]
-                   4'b0?00: `PHY_CMD (DPWRITE, `CMD_IR_WRITE, 4, `IR_DPACC)  // WRITE DP[0/4/8]
-                   4'b1000: `PHY_CMD (DPWRITE, `CMD_IR_WRITE, 4, `IR_DPACC)  // WRITE DP[8]
-                   4'b??1?: `PHY_CMD (APACCESS, `CMD_IR_WRITE, 4, `IR_APACC) // READ/WRITE AP
+                   4'b0101: state <= DPREAD;   // READ DP[4]
+                   4'b1?01: state <= DPREAD;   // READ DP[8/C]
+                   4'b0?00: state <= DPWRITE;  // WRITE DP[0/4/8]
+                   4'b1000: state <= DPWRITE;  // WRITE DP[8]
+                   4'b??1?: state <= APACCESS; // READ/WRITE AP
                    // Pseudo DP registers
                    // DP[0]    read - emulate IDCODE found on SWD interface
                    // DP[0xc] write - Handle RESET/line switch
