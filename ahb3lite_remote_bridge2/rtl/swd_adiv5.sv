@@ -2,7 +2,7 @@
  *  ARM ADIv5.2 debug interface for SWD - Converts common FIFO interface to SWD commands
  *
  *  Commands are passed via a FIFO. Input commands have the following format:
- *  [39:0] = DATA[31:0], ADDR[5:0], APnDP, RnW
+ *  [39:0] = DATA[31:0], ADDR[1:0], APnDP, RnW
  * 
  *  Responses are returned through a FIFO with the following format:
  *  [34:0] = DATA[31:0], STAT[2:0]
@@ -13,7 +13,7 @@
  **/
 
 // Local params
-localparam CMD_WIDTH = 40;
+localparam CMD_WIDTH = 36;
 localparam RESP_WIDTH = 35;
 
 `define PHY_RAW(_state, _len, _t0, _t1, _dat)  begin  \
@@ -38,7 +38,7 @@ localparam RESP_WIDTH = 35;
    end end
        
 // Max number of retries
-`define RETRY_MAX  5'h31
+`define RETRY_MAX  5'd31
 
 module swd_adiv5 # ( parameter FIFO_AW = 2 )
    (
@@ -67,7 +67,7 @@ module swd_adiv5 # ( parameter FIFO_AW = 2 )
 
    // Command logic
    logic                    APnDP, RnW;
-   logic [5:0]              addr;
+   logic [1:0]              addr;
    logic [31:0]             dato;
 
    // Response logic
@@ -117,8 +117,8 @@ module swd_adiv5 # ( parameter FIFO_AW = 2 )
    logic [42:0]             phy_cmd;
    logic [2:0]              phy_resp;
    
-   //               turn, dparity, data, turn, park, stop, cmd parity,               addr[1:0], RnW, APnDP, start
-   assign phy_cmd = {1'b0, ^dato, dato, 1'b0, 1'b1, 1'b0, ^{addr[1:0], RnW, APnDP}, addr[1:0], RnW, APnDP, 1'b1};
+   //               turn, dparity, data, turn, park, stop, cmd parity,         addr, RnW, APnDP, start
+   assign phy_cmd = {1'b0, ^dato, dato, 1'b0, 1'b1, 1'b0, ^{addr, RnW, APnDP}, addr, RnW, APnDP, 1'b1};
    
    // Underlying PHY
    swd_phy # (.FIFO_AW (FIFO_AW))
@@ -218,20 +218,22 @@ module swd_adiv5 # ( parameter FIFO_AW = 2 )
             CMD:
               begin
                  // Execute command
-                 casez ({addr[2:0], APnDP, RnW})
+                 casez ({addr, APnDP, RnW})
                    default:  state <= IDLE;
-                   5'b0???1: `PHY_READ (RESPONSE)  // READ
-                   5'b0??10: `PHY_WRITE (FLUSH)    // AP WRITE
-                   5'b0??00: `PHY_WRITE (RESPONSE) // DP WRITE
+                   4'b??11: `PHY_READ  (RESPONSE) // AP READ
+                   4'b??01: `PHY_READ  (RESPONSE) // DP READ
+                   4'b??10: `PHY_WRITE (FLUSH)    // AP WRITE
+                   4'b1000: `PHY_WRITE (RESPONSE) // DP WRITE [8]
+                   4'b0?00: `PHY_WRITE (RESPONSE) // DP WRITE [0/4]
                    // Pseudo DP registers
                    // DP[0x10] write - Handle RESET/protocol switch
-                   5'b10000: begin
+                   4'b1100: begin
                       if (dato[0])
                         `PHY_RAW (SWITCH, 60, 63, 63, {64{1'b1}})
                       else
                         `PHY_RAW (DONE, 60, 63, 63, {64{1'b1}})
                    end
-                 endcase // casez ({addr[2:0], APnDP, RnW})
+                 endcase // casez ({addr, APnDP, RnW})
               end
 
             // Switch to SWD
@@ -249,7 +251,7 @@ module swd_adiv5 # ( parameter FIFO_AW = 2 )
                  busy <= 0;
                  state <= IDLE;
               end
-            
+
             // Return response to client
             RESPONSE:
               if (phy_dvalid) 

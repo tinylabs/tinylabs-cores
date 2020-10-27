@@ -2,7 +2,7 @@
  *  ARM ADIv5.2 debug interface for JTAG - Converts common FIFO interface to JTAG commands
  *
  *  Commands are passed via a FIFO. Input commands have the following format:
- *  [39:0] = DATA[31:0], ADDR[5:0], APnDP, RnW
+ *  [39:0] = DATA[31:0], ADDR[1:0], APnDP, RnW
  * 
  *  Responses are returned through a FIFO with the following format:
  *  [34:0] = DATA[31:0], STAT[2:0]
@@ -13,7 +13,7 @@
  **/
 
 // Local params
-localparam CMD_WIDTH = 40;
+localparam CMD_WIDTH = 36;
 localparam RESP_WIDTH = 35;
 
 `define PHY_CMD(_state, _cmd, _len, _dat)  begin   \
@@ -81,7 +81,7 @@ module jtag_adiv5 # ( parameter FIFO_AW = 2 )
 
    // Command logic
    logic                    APnDP, RnW;
-   logic [5:0]              addr;
+   logic [1:0]              addr;
    logic [31:0]             dato;
 
    // Response logic
@@ -233,7 +233,7 @@ module jtag_adiv5 # ( parameter FIFO_AW = 2 )
             CMD:
               begin
                  // Execute command
-                 casez ({addr[1:0], APnDP, RnW})
+                 casez ({addr, APnDP, RnW})
                    default:  state <= IDLE;
                    4'b0101: `PHY_CMD (DPREAD, `CMD_IR_WRITE, 4, `IR_DPACC)   // READ DP[4]
                    4'b1?01: `PHY_CMD (DPREAD, `CMD_IR_WRITE, 4, `IR_DPACC)   // READ DP[8/C]
@@ -250,7 +250,7 @@ module jtag_adiv5 # ( parameter FIFO_AW = 2 )
                       else
                         `PHY_CMD (RESET_DONE, `CMD_RESET, 0, 35'h0)
                    end
-                 endcase // casez ({addr[1:0], APnDP, RnW})
+                 endcase // casez ({addr, APnDP, RnW})
               end
 
             // Done return to IDLE
@@ -264,13 +264,13 @@ module jtag_adiv5 # ( parameter FIFO_AW = 2 )
             IDCODE:   `PHY_CMD (RESPONSE, `CMD_DR_READ, 32, 35'h0)
 
             // DP write
-            DPWRITE:  `PHY_CMD (CHECK, `CMD_DR_WRITE, 35, {dato, addr[1:0], 1'b0})
+            DPWRITE:  `PHY_CMD (CHECK, `CMD_DR_WRITE, 35, {dato, addr, 1'b0})
             
             // DP read
-            DPREAD:   `PHY_CMD (CHECK, `CMD_DR_WRITE, 35, {32'h0, addr[1:0], 1'b1})
+            DPREAD:   `PHY_CMD (CHECK, `CMD_DR_WRITE, 35, {32'h0, addr, 1'b1})
 
             // AP access
-            APACCESS: `PHY_CMD (FLUSH, `CMD_DR_WRITE, 35, {dato, addr[1:0], RnW})
+            APACCESS: `PHY_CMD (FLUSH, `CMD_DR_WRITE, 35, {dato, addr, RnW})
 
             // Flush AP write
             FLUSH:    `PHY_CMD (CHECK, `CMD_FLUSH, 0, 35'h0)

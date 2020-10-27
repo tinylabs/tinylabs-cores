@@ -149,8 +149,8 @@ void jtag_adiv5_tb::write (uint8_t addr, bool APnDP, bool RnW, uint32_t data)
     doCycle ();
 
   // Setup data
-  top->WRDATA = (uint64_t)data << 8;
-  top->WRDATA |= (addr & 0xfc);
+  top->WRDATA = (uint64_t)data << 4;
+  top->WRDATA |= (addr & 3) << 2;
   if (APnDP)
     top->WRDATA |= 1 << 1;
   if (RnW)
@@ -192,14 +192,14 @@ uint32_t jtag_adiv5_tb::read (void)
 
 void jtag_adiv5_tb::dp_write (uint8_t addr, uint32_t data)
 {
-  write (addr, 0, 0, data);
+  write ((addr >> 2) & 3, 0, 0, data);
   if (addr != 0xc)
     read ();
 }
 
 uint32_t jtag_adiv5_tb::dp_read (uint8_t addr)
 {
-  write (addr, 0, 1, 0);
+  write ((addr >> 2) & 3, 0, 1, 0);
   return read ();
 }
 
@@ -207,11 +207,11 @@ uint32_t jtag_adiv5_tb::dp_read (uint8_t addr)
 uint32_t jtag_adiv5_tb::ap_read (uint8_t apsel, uint8_t addr)
 {
   // Write DP[8] = SELECT
-  write (8, 0, 0, (apsel << 24) | addr);
+  write (2, 0, 0, (apsel << 24) | addr);
   read ();
   
   // Read AP[addr]
-  write (addr & 0xc, 1, 1, 0);
+  write ((addr >> 2) & 3, 1, 1, 0);
   
   // Get result
   return read ();
@@ -220,11 +220,11 @@ uint32_t jtag_adiv5_tb::ap_read (uint8_t apsel, uint8_t addr)
 void jtag_adiv5_tb::ap_write (uint8_t apsel, uint8_t addr, uint32_t data)
 {
   // Write DP[8] = SELECT
-  write (8, 0, 0, (apsel << 24) | addr);
+  write (2, 0, 0, (apsel << 24) | addr);
   read ();
   
   // Write AP[addr]
-  write (addr & 0xc, 1, 0, data);
+  write ((addr >> 2) & 3, 1, 0, data);
   read ();
 }
 
