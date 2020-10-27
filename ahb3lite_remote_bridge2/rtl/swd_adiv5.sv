@@ -16,22 +16,21 @@
 localparam CMD_WIDTH = 40;
 localparam RESP_WIDTH = 35;
 
-`define PHY_RAW(_state, _len, _t0, _t1, _dat, _done)  begin  \
-   if (phy_wren) begin                                       \
-      phy_wren <= 0;                                         \
-      state <= _state;                                       \
-      if (_done) busy <= 0;                                  \
-   end                                                       \
-   else if (!phy_full) begin                                 \
-      phy_olen <= _len;                                      \
-      phy_t0 <= _t0;                                         \
-      phy_t1 <= _t1;                                         \
-      phy_dato <= _dat;                                      \
-      phy_wren <= 1;                                         \
+`define PHY_RAW(_state, _len, _t0, _t1, _dat)  begin  \
+   if (phy_wren) begin                                \
+      phy_wren <= 0;                                  \
+      state <= _state;                                \
+   end                                                \
+   else if (!phy_full) begin                          \
+      phy_olen <= _len;                               \
+      phy_t0 <= _t0;                                  \
+      phy_t1 <= _t1;                                  \
+      phy_dato <= _dat;                               \
+      phy_wren <= 1;                                  \
    end end
 
-`define PHY_READ(_state, _done)  `PHY_RAW(_state, 46, 8, 45, {21'h0, phy_cmd}, _done)
-`define PHY_WRITE(_state, _done) `PHY_RAW(_state, 46, 8, 12, {21'h0, phy_cmd}, _done)
+`define PHY_READ(_state)  `PHY_RAW(_state, 46, 8, 45, {21'h0, phy_cmd})
+`define PHY_WRITE(_state) `PHY_RAW(_state, 46, 8, 12, {21'h0, phy_cmd})
  
 `define PHY_RSP(_state) begin                  \
    if (phy_dvalid) begin                       \
@@ -122,8 +121,8 @@ module swd_adiv5 # ( parameter FIFO_AW = 2 )
    assign phy_cmd = {1'b0, ^dato, dato, 1'b0, 1'b1, 1'b0, ^{addr[1:0], RnW, APnDP}, addr[1:0], RnW, APnDP, 1'b1};
    
    // Underlying PHY
-   swd_phy u_phy
-     (
+   swd_phy # (.FIFO_AW (FIFO_AW))
+   u_phy (
       .CLK      (CLK),
       .PHY_CLK  (PHY_CLK),
       .RESETn   (RESETn),
@@ -166,7 +165,8 @@ module swd_adiv5 # ( parameter FIFO_AW = 2 )
                              RESET2   = 3,
                              FLUSH    = 4,
                              RESPONSE = 5,
-                             IGNORE   = 6
+                             IGNORE   = 6,
+                             DONE     = 7
                              } state_t;
    state_t state;
    
@@ -220,28 +220,35 @@ module swd_adiv5 # ( parameter FIFO_AW = 2 )
                  // Execute command
                  casez ({addr[2:0], APnDP, RnW})
                    default:  state <= IDLE;
-                   5'b0???1: `PHY_READ (RESPONSE, 1)  // READ
-                   5'b0??10: `PHY_WRITE (FLUSH, 0)    // AP WRITE
-                   5'b0??00: `PHY_WRITE (RESPONSE, 1) // DP WRITE
+                   5'b0???1: `PHY_READ (RESPONSE)  // READ
+                   5'b0??10: `PHY_WRITE (FLUSH)    // AP WRITE
+                   5'b0??00: `PHY_WRITE (RESPONSE) // DP WRITE
                    // Pseudo DP registers
                    // DP[0x10] write - Handle RESET/protocol switch
                    5'b10000: begin
                       if (dato[0])
-                        `PHY_RAW (SWITCH, 60, 63, 63, {64{1'b1}}, 0)
+                        `PHY_RAW (SWITCH, 60, 63, 63, {64{1'b1}})
                       else
-                        `PHY_RAW (IDLE, 60, 63, 63, {64{1'b1}}, 1)
+                        `PHY_RAW (DONE, 60, 63, 63, {64{1'b1}})
                    end
                  endcase // casez ({addr[2:0], APnDP, RnW})
               end
 
             // Switch to SWD
-            SWITCH:  `PHY_RAW (RESET2, 16, 63, 63, {48'h0, 16'he79e}, 0)
+            SWITCH:  `PHY_RAW (RESET2, 16, 63, 63, {48'h0, 16'he79e})
 
             // Do additional line reset
-            RESET2:  `PHY_RAW (IDLE, 62, 63, 63, {10'h0, {54{1'b1}}}, 1)
+            RESET2:  `PHY_RAW (DONE, 62, 63, 63, {10'h0, {54{1'b1}}})
 
             // Flush after AP write
-            FLUSH:   `PHY_RAW (RESPONSE, 8, 63, 63, 64'h0, 1)
+            FLUSH:   `PHY_RAW (RESPONSE, 8, 63, 63, 64'h0)
+
+            // Finished - return to IDLE
+            DONE:
+              begin
+                 busy <= 0;
+                 state <= IDLE;
+              end
             
             // Return response to client
             RESPONSE:
@@ -250,7 +257,7 @@ module swd_adiv5 # ( parameter FIFO_AW = 2 )
                    
                    // Retries exceeded - Issue ABORT
                    if (retries == `RETRY_MAX)
-                     `PHY_RAW (IGNORE, 46, 8, 12, 64'h20000003EA1, 1) 
+                     `PHY_RAW (IGNORE, 46, 8, 12, 64'h20000003EA1) 
                    // Response OK and parity OK on READ
                    else if ((phy_resp == 3'b100) && ((^phy_dati[32:1] == phy_dati[0]) | ~RnW))
                      begin

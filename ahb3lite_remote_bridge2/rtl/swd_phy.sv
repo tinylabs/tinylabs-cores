@@ -11,7 +11,8 @@ module swd_phy
   # (parameter OWIDTH = 64,
      parameter IWIDTH = 38,
      parameter _OWIDTH = OWIDTH + (3 * $clog2(OWIDTH)),
-     parameter _IWIDTH = IWIDTH + $clog2(IWIDTH) - 1
+     parameter _IWIDTH = IWIDTH + $clog2(IWIDTH) - 1,
+     parameter FIFO_AW = 2
      )
    (
     input                CLK,
@@ -54,7 +55,7 @@ module swd_phy
    // Input FIFO
    // LEN, T0, T1, SO
    dual_clock_fifo #(
-                     .ADDR_WIDTH   (2),
+                     .ADDR_WIDTH   (FIFO_AW),
                      .DATA_WIDTH   (_OWIDTH))
    u_phy_in (
              // Interface domain
@@ -74,7 +75,7 @@ module swd_phy
    // Output FIFO
    // LEN, SI
    dual_clock_fifo #(
-                     .ADDR_WIDTH   (2),
+                     .ADDR_WIDTH   (FIFO_AW),
                      .DATA_WIDTH   (_IWIDTH))
    u_phy_out (
              // PHY domain

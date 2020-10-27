@@ -64,6 +64,12 @@ module jtag_phy
    // 5 = 101 = Read IR
    // 6 = 110 = Write IR auto-extend
    // 7 = 111 = Read IR auto-extend
+   //
+   // Special cases
+   // len = 0
+   //   cmd == 000 - RESET
+   //   cmd == 100 - JTAG SWITCH
+   //   cmd == 110 - Insert 8 IDLE cycles
    
    // Command and shadow
    logic [2:0]  cmd, cmdp;
@@ -117,8 +123,8 @@ module jtag_phy
    logic                        gate_tck;
 
    // Gate TCK when IDLE - save power
-   assign gate_tck = ((state == RUNTEST_IDLE) && (nstate == RUNTEST_IDLE));
-   
+   assign gate_tck = ((state == RUNTEST_IDLE) && !pending);
+
    // FIFO interfaces with layer above
    dual_clock_fifo #(.ADDR_WIDTH (FIFO_AW),
                      .DATA_WIDTH (FIFO_IN_SZ))
@@ -334,7 +340,7 @@ module jtag_phy
                     
                          // Move to RESET
                          if (olenp == 0)
-                           nstate <= LOGIC_RESET;
+                           nstate <= RUNTEST_IDLE;
                          // Move to SHIFT-IR
                          else if (cmdp[2])
                            nstate <= SHIFT_IR;
@@ -350,32 +356,33 @@ module jtag_phy
 
                // Handle RESET/SWD -> JTAG switching
                // Override state machine
-               if ((olen == 0) & pending)
+               if ((state == RUNTEST_IDLE) && (olen == 0) & pending)
                  begin
                          
                     // Sequence TMS on counter
                     case (ctr[6:0])
-                      7'd0:  TMS <= 1; // 50+ TMS=1
-                      7'd8: if (cmd == 3'b000) TMS <= 0;
-                      7'd9: if (cmd == 3'b000) // Handle normal RESET
+                      7'd8: if (cmd == 3'b110)
                         begin
-                           state <= RUNTEST_IDLE;
-                           nstate <= RUNTEST_IDLE;
                            pending <= 0;
                            busy <= 0;
                         end
-                      7'd60: TMS <= 0; // 2 TMS=0
-                      7'd62: TMS <= 1; // 4 TMS=1
-                      7'd66: TMS <= 0; // 2 TMS=0
-                      7'd68: TMS <= 1; // 3 TMS=1
-                      7'd71: TMS <= 0; // 2 TMS=0
-                      7'd73: TMS <= 1; // 5+ TMS=1
-                      7'd85: TMS <= 0; // Return to IDLE
-                      7'd86: begin
+                      7'd9:  TMS <= 1; // 50+ TMS=1
+                      7'd17: if (cmd == 3'b000) TMS <= 0;
+                      7'd18: if (cmd == 3'b000) // Handle normal RESET
+                        begin
+                           pending <= 0;
+                           busy <= 0;
+                        end
+                      7'd69: TMS <= 0; // 2 TMS=0
+                      7'd71: TMS <= 1; // 4 TMS=1
+                      7'd75: TMS <= 0; // 2 TMS=0
+                      7'd77: TMS <= 1; // 3 TMS=1
+                      7'd80: TMS <= 0; // 2 TMS=0
+                      7'd82: TMS <= 1; // 5+ TMS=1
+                      7'd94: TMS <= 0; // Return to IDLE
+                      7'd95: begin
                          pending <= 0;
                          busy <= 0;
-                         state <= RUNTEST_IDLE;
-                         nstate <= RUNTEST_IDLE;
                       end
                       default: ;
                     endcase // case (ctr[6:0])
@@ -383,9 +390,6 @@ module jtag_phy
                     // Increment counter
                     ctr <= ctr + 1;
                     
-                    // Force state
-                    if (ctr == 0)
-                      state <= LOGIC_RESET;
                  end
                
                else

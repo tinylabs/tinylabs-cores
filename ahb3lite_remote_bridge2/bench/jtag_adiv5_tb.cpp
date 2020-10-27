@@ -179,7 +179,11 @@ uint32_t jtag_adiv5_tb::read (void)
   
   // Check response
   if ((stat_t)(top->RDDATA & 7) != OK) {
+    int i;
     printf ("read failed: %d\n", (int)(top->RDDATA & 7));
+    for (i = 0; i < 100; i++)
+      doCycle ();
+    done = true; // Bail
   }
   
   // Return data
@@ -189,6 +193,8 @@ uint32_t jtag_adiv5_tb::read (void)
 void jtag_adiv5_tb::dp_write (uint8_t addr, uint32_t data)
 {
   write (addr, 0, 0, data);
+  if (addr != 0xc)
+    read ();
 }
 
 uint32_t jtag_adiv5_tb::dp_read (uint8_t addr)
@@ -201,14 +207,12 @@ uint32_t jtag_adiv5_tb::dp_read (uint8_t addr)
 uint32_t jtag_adiv5_tb::ap_read (uint8_t apsel, uint8_t addr)
 {
   // Write DP[8] = SELECT
-  write (8, 0, 0, apsel << 24 | addr);
-
+  write (8, 0, 0, (apsel << 24) | addr);
+  read ();
+  
   // Read AP[addr]
   write (addr & 0xc, 1, 1, 0);
-
-  // Read DP[0xc] = RDBUFF
-  write (0xc, 0, 1, 0);
-
+  
   // Get result
   return read ();
 }
@@ -216,10 +220,12 @@ uint32_t jtag_adiv5_tb::ap_read (uint8_t apsel, uint8_t addr)
 void jtag_adiv5_tb::ap_write (uint8_t apsel, uint8_t addr, uint32_t data)
 {
   // Write DP[8] = SELECT
-  write (8, 0, 0, apsel << 24 | addr);
-
+  write (8, 0, 0, (apsel << 24) | addr);
+  read ();
+  
   // Write AP[addr]
   write (addr & 0xc, 1, 0, data);
+  read ();
 }
 
 
@@ -243,10 +249,10 @@ int main (int argc, char **argv)
   dut->Enable ();
 
   // Reset
-  dut->dp_write (0x10, 0);
+  dut->dp_write (0xc, 0);
 
   // Switch to JTAG
-  dut->dp_write (0x10, 1);
+  dut->dp_write (0xc, 1);
   
   // Get IDCOde
   printf ("IDCODE=%08X\n", dut->dp_read (0));
@@ -255,7 +261,9 @@ int main (int argc, char **argv)
   dut->dp_write (4, 0x50000000);
 
   // Read back STAT
-  if ((dut->dp_read (4) & 0xf0000000) == 0xf0000000)
+  val = dut->dp_read (4);
+  printf ("CTRL/STAT=%08X\n", val); 
+  if ((val & 0xf0000000) == 0xf0000000)
     printf ("PWR|DBG enabled\n");
 
   // Read IDR
@@ -283,10 +291,13 @@ int main (int argc, char **argv)
   dut->ap_write (0, 4, 0x20000000);
 
   // Write to RAM
+  printf ("RAM test... ");
   dut->ap_write (0, 0xc, 0xdeadc0de);
   if (dut->ap_read (0, 0xc) == 0xdeadc0de)
-    printf ("RAM test OK.\n");
-  
+    printf ("OK\n");
+  else
+    printf ("FAILED\n");
+
   // Add padding to end
   for (i = 0; i < 200; i++)
     dut->doCycle ();

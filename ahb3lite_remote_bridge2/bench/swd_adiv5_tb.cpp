@@ -212,7 +212,7 @@ uint32_t swd_adiv5_tb::ap_read (uint8_t apsel, uint8_t addr)
     
   // Read DP[0xc] = RDBUFF
   write (0xc, 0, 1, 0);
-  
+
   // Get result
   return read ();
 }
@@ -294,8 +294,8 @@ int main (int argc, char **argv)
   dut->ap_write (0, 0xc, 0xdeadc0de);
   if (dut->ap_read (0, 0xc) == 0xdeadc0de)
     printf ("RAM test OK.\n");
-
-  printf ("RAM=%08X\n", dut->ap_read (0, 0xc));
+  else
+    printf ("RAM test FAILED.\n");
   
   // Add padding to end
   for (i = 0; i < 200; i++)
