@@ -66,8 +66,8 @@ module swd_adiv5 # ( parameter FIFO_AW = 2 )
     );
 
    // Command logic
-   logic                    APnDP, RnW;
-   logic [1:0]              addr;
+   logic                    APnDP, APnDPp, RnW;
+   logic [1:0]              addr, addrp;
    logic [31:0]             dato;
 
    // Response logic
@@ -89,7 +89,7 @@ module swd_adiv5 # ( parameter FIFO_AW = 2 )
              .wr_data_i (WRDATA),
              .wr_en_i   (WREN),
              .full_o    (WRFULL),
-             .rd_data_o ({dato, addr, APnDP, RnW}),
+             .rd_data_o ({dato, addrp, APnDPp, RnW}),
              .rd_en_i   (rden),
              .empty_o   (empty)
              );
@@ -211,6 +211,8 @@ module swd_adiv5 # ( parameter FIFO_AW = 2 )
                    begin
                       state <= CMD;
                       dvalid <= 0;
+                      addr <= addrp;
+                      APnDP <= APnDPp;
                    end
               end
             
@@ -263,14 +265,26 @@ module swd_adiv5 # ( parameter FIFO_AW = 2 )
                    // Response OK and parity OK on READ
                    else if ((phy_resp == 3'b100) && ((^phy_dati[32:1] == phy_dati[0]) | ~RnW))
                      begin
-                        // Copy data/status
-                        dati <= {<<{phy_dati[32:1]}};
-                        stat <= phy_resp;
-                   
-                        // Write to FIFO, return to IDLE
-                        state <= IDLE;
-                        wren <= 1;
-                        busy <= 0;
+
+                        // If AP read move to read DP[0xc]
+                        if (APnDP & RnW)
+                          begin  // Read RDBUF (DP[0xC]
+                             addr <= 3;
+                             APnDP <= 0;
+                             state <= CMD;                             
+                          end
+                        // Done return results
+                        else
+                          begin
+                             // Copy data/status
+                             dati <= {<<{phy_dati[32:1]}};
+                             stat <= phy_resp;
+                        
+                             // Write to FIFO, return to IDLE
+                             state <= IDLE;
+                             wren <= 1;
+                             busy <= 0;
+                          end
                      end
                    else 
                      begin // Retry transaction                        

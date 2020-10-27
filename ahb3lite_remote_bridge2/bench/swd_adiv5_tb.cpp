@@ -212,10 +212,6 @@ uint32_t swd_adiv5_tb::ap_read (uint8_t apsel, uint8_t addr)
   
   // Read AP[addr]
   write ((addr >> 2) & 3, 1, 1, 0);
-  read ();
-    
-  // Read DP[0xc] = RDBUFF
-  write (3, 0, 1, 0);
 
   // Get result
   return read ();
