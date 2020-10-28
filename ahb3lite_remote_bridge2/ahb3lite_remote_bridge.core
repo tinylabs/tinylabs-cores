@@ -9,7 +9,7 @@ filesets:
             - fifo
         files:
 #            - rtl/ahb3lite_remote_bridge.sv
-#            - rtl/clkdiv.sv
+            - rtl/debug_clkdiv.sv
             - rtl/swd_phy.sv
             - rtl/jtag_phy.sv
             - rtl/jtag_adiv5.sv
