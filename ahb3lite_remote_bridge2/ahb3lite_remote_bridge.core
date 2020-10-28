@@ -13,6 +13,8 @@ filesets:
             - rtl/swd_phy.sv
             - rtl/jtag_phy.sv
             - rtl/jtag_adiv5.sv
+            - rtl/swd_adiv5.sv
+            - rtl/debug_mux.sv
         file_type : verilogSource
 
     swd_phy:
@@ -23,15 +25,6 @@ filesets:
             - rtl/swd_phy.sv : {file_type : verilogSource}
             - bench/swd_phy_tb.cpp : {file_type : cppSource}
 
-    swd_adiv5:
-        depend:
-            - verilator_utils
-            - fifo
-        files: 
-           - rtl/swd_phy.sv : {file_type : verilogSource}
-           - rtl/swd_adiv5.sv : {file_type : verilogSource}
-           - bench/swd_adiv5_tb.cpp : {file_type : cppSource}
-            
     jtag_phy:
         depend:
             - verilator_utils
@@ -40,15 +33,12 @@ filesets:
            - rtl/jtag_phy.sv : {file_type : verilogSource}
            - bench/jtag_phy_tb.cpp : {file_type : cppSource}
             
-    jtag_adiv5:
+    debug_mux:
         depend:
             - verilator_utils
-            - fifo
-        files: 
-           - rtl/jtag_phy.sv : {file_type : verilogSource}
-           - rtl/jtag_adiv5.sv : {file_type : verilogSource}
-           - bench/jtag_adiv5_tb.cpp : {file_type : cppSource}
-            
+        files:
+            - bench/debug_mux_tb.cpp : {file_type : cppSource}
+
 targets:
     default:
         filesets : [rtl]
@@ -66,21 +56,15 @@ targets:
         description: Test SWD phy with verilator
         toplevel: [swd_phy]
 
-    swd_adiv5:
-        <<: *sim
-        filesets : [swd_adiv5]
-        description: ADIv5 interface layer test
-        toplevel: [swd_adiv5]
-
     jtag_phy:
         <<: *sim
         filesets : [jtag_phy]
         description: Test JTAG phy with verilator
         toplevel: [jtag_phy]
 
-    jtag_adiv5:
+    debug_mux:
         <<: *sim
-        filesets : [jtag_adiv5]
-        description: ADIv5 interface layer test
-        toplevel: [jtag_adiv5]
-        
+        filesets : [rtl, debug_mux]
+        description: Debug mux test
+        toplevel: [debug_mux]
+

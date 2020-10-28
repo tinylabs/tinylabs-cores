@@ -7,6 +7,9 @@
  *  2020
  */
 
+localparam SWD_CMD_WIDTH    = 82;
+localparam SWD_RESP_WIDTH   = 43;
+
 module swd_phy
   # (parameter OWIDTH = 64,
      parameter IWIDTH = 38,
@@ -18,7 +21,6 @@ module swd_phy
     input                CLK,
     input                PHY_CLK,
     input                RESETn,
-    input                ENABLE,
     
     // FIFO interface IN
     input [_OWIDTH-1:0]  WRDATA,
@@ -100,7 +102,7 @@ module swd_phy
    always @(posedge PHY_CLK, negedge PHY_CLK)
      begin
 
-        if (!RESETn | !ENABLE)
+        if (!RESETn)
           begin
              SWDOE <= 1;
              SWDOUT <= 0;
@@ -217,7 +219,7 @@ module swd_phy
                   
                end // else: !if(PHY_CLK)
              
-          end // else: !if(!RESETn | !ENABLE)
+          end // else: !if(!RESETn)
         
      end // always @ (posedge PHY_CLK, negedge PHY_CLK)
    

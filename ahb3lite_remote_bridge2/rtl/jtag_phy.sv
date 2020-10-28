@@ -10,6 +10,9 @@
 // Update JTAG finite state machine
 `define FSM(_state, _tms) begin TMS <= _tms; state <= (_state); end
 
+localparam JTAG_CMD_WIDTH   = 79;
+localparam JTAG_RESP_WIDTH  = 70;
+
 module jtag_phy
   # (parameter MAX_CLEN = 4096,  // Max total scan chain length
      parameter BUF_SZ   = 64,    // Data bits per FIFO packet
@@ -28,7 +31,6 @@ module jtag_phy
     input                    CLK,
     input                    PHY_CLK,
     input                    RESETn,
-    input                    ENABLE,
 
     // FIFO interface IN
     input [FIFO_IN_SZ-1:0]   WRDATA,
@@ -165,7 +167,7 @@ module jtag_phy
    assign rden = !empty & !dvalid & !busy;
    
    always @(posedge PHY_CLK, negedge PHY_CLK)
-     if (!RESETn | !ENABLE)
+     if (!RESETn)
        begin
           TCK <= 0;
           TDI <= 0;
@@ -448,6 +450,6 @@ module jtag_phy
 
             end // else: !if(PHY_CLK)
           
-       end // else: !if(!RESETn | !ENABLE)
+       end // else: !if(!RESETn)
 
 endmodule // jtag_phy

@@ -12,25 +12,18 @@
  *  2020
  **/
 
-// Local params
-localparam CMD_WIDTH = 36;
-localparam RESP_WIDTH = 35;
-
 `define PHY_RAW(_state, _len, _t0, _t1, _dat)  begin  \
-   if (phy_wren) begin                                \
-      phy_wren <= 0;                                  \
+   if (PHY_WREN) begin                                \
+      PHY_WREN <= 0;                                  \
       state <= _state;                                \
    end                                                \
-   else if (!phy_full) begin                          \
-      phy_olen <= _len;                               \
-      phy_t0 <= _t0;                                  \
-      phy_t1 <= _t1;                                  \
-      phy_dato <= _dat;                               \
-      phy_wren <= 1;                                  \
+   else if (!PHY_WRFULL) begin                        \
+      PHY_WRDATA <= {_len, _t0, _t1, _dat};           \
+      PHY_WREN <= 1;                                  \
    end end
 
-`define PHY_READ(_state)  `PHY_RAW(_state, 46, 8, 45, {21'h0, phy_cmd})
-`define PHY_WRITE(_state) `PHY_RAW(_state, 46, 8, 12, {21'h0, phy_cmd})
+`define PHY_READ(_state)  `PHY_RAW(_state, 6'd46, 6'd8, 6'd45, {21'h0, phy_cmd})
+`define PHY_WRITE(_state) `PHY_RAW(_state, 6'd46, 6'd8, 6'd12, {21'h0, phy_cmd})
  
 `define PHY_RSP(_state) begin                  \
    if (phy_dvalid) begin                       \
@@ -38,31 +31,33 @@ localparam RESP_WIDTH = 35;
    end end
        
 // Max number of retries
-`define RETRY_MAX  5'd31
+`define RETRY_MAX  4'd15
 
-module swd_adiv5 # ( parameter FIFO_AW = 2 )
+module swd_adiv5 #(
+                   parameter FIFO_AW = 2,
+                   parameter ADIv5_CMD_WIDTH = 36,
+                   parameter ADIv5_RESP_WIDTH = 35
+                   )
    (
     // Core signals
-    input                   CLK,
-    input                   PHY_CLK,
-    input                   RESETn,
-    input                   ENABLE,
+    input                            CLK,
+    input                            RESETn,
 
-    // FIFO interface in
-    input [CMD_WIDTH-1:0]   WRDATA,
-    input                   WREN,
-    output                  WRFULL,
+    // CMD interface
+    input [ADIv5_CMD_WIDTH-1:0]      WRDATA,
+    input                            WREN,
+    output                           WRFULL,
+    output [ADIv5_RESP_WIDTH-1:0]    RDDATA,
+    input                            RDEN,
+    output                           RDEMPTY,
 
-    // FIFO interface out
-    output [RESP_WIDTH-1:0] RDDATA,
-    input                   RDEN,
-    output                  RDEMPTY,
-
-    // SWD signals
-    output                  TCK,
-    output                  TMSOUT,
-    input                   TMSIN,
-    output                  TMSOE
+    // PHY interface
+    output logic [SWD_CMD_WIDTH-1:0] PHY_WRDATA,
+    output logic                     PHY_WREN,
+    input                            PHY_WRFULL,
+    input [SWD_RESP_WIDTH-1:0]       PHY_RDDATA,
+    output logic                     PHY_RDEN,
+    input                            PHY_RDEMPTY
     );
 
    // Command logic
@@ -81,7 +76,7 @@ module swd_adiv5 # ( parameter FIFO_AW = 2 )
    // Create FIFOs to pass commands
    fifo # (
            .DEPTH_WIDTH (FIFO_AW),
-           .DATA_WIDTH  (CMD_WIDTH)
+           .DATA_WIDTH  (ADIv5_CMD_WIDTH)
            )
    u_cmd_in (
              .clk       (CLK),
@@ -95,7 +90,7 @@ module swd_adiv5 # ( parameter FIFO_AW = 2 )
              );
    fifo # (
            .DEPTH_WIDTH (FIFO_AW),
-           .DATA_WIDTH  (RESP_WIDTH)
+           .DATA_WIDTH  (ADIv5_RESP_WIDTH)
            )
    u_resp_out (
                .clk       (CLK),
@@ -109,53 +104,24 @@ module swd_adiv5 # ( parameter FIFO_AW = 2 )
                );
 
    // Phy logic
-   logic [63:0]             phy_dato;
-   logic [36:0]             phy_dati;
-   logic [5:0]              phy_olen, phy_ilen;
-   logic [5:0]              phy_t0, phy_t1;
-   logic                    phy_wren, phy_rden, phy_empty, phy_full, phy_dvalid;
+   logic                    phy_dvalid;
    logic [42:0]             phy_cmd;
    logic [2:0]              phy_resp;
    
    //               turn, dparity, data, turn, park, stop, cmd parity,         addr, RnW, APnDP, start
    assign phy_cmd = {1'b0, ^dato, dato, 1'b0, 1'b1, 1'b0, ^{addr, RnW, APnDP}, addr, RnW, APnDP, 1'b1};
    
-   // Underlying PHY
-   swd_phy # (.FIFO_AW (FIFO_AW))
-   u_phy (
-      .CLK      (CLK),
-      .PHY_CLK  (PHY_CLK),
-      .RESETn   (RESETn),
-      .ENABLE   (ENABLE),
-
-      // FIFO in
-      .WRDATA  ({phy_olen, phy_t0, phy_t1, phy_dato}),
-      .WREN    (phy_wren),
-      .WRFULL  (phy_full),
-      
-      // FIFO out
-      .RDDATA  ({phy_dati, phy_ilen}),
-      .RDEN    (phy_rden),
-      .RDEMPTY (phy_empty),
-
-      // SWD signals
-      .SWDCLK  (TCK),
-      .SWDIN   (TMSIN),
-      .SWDOUT  (TMSOUT),
-      .SWDOE   (TMSOE)
-      );
-
    // AP selected
-   logic [4:0]              retries;
+   logic [3:0]              retries;
 
    // Combinatorial logic
    assign rden = !empty & !busy;
 
    // Read PHY as soon as available
-   assign phy_rden = !phy_empty;
+   assign PHY_RDEN = !PHY_RDEMPTY;
 
    // Response from phy
-   assign phy_resp = RnW ? phy_dati[35:33] : phy_dati[2:0];
+   assign phy_resp = RnW ? PHY_RDDATA[41:39] : PHY_RDDATA[8:6];
    
    // State machine
    typedef enum logic [2:0] {
@@ -190,7 +156,7 @@ module swd_adiv5 # ( parameter FIFO_AW = 2 )
             end
 
           // PHY data available one cycle after read
-          if (phy_rden)
+          if (PHY_RDEN)
             phy_dvalid <= 1;
           else
             phy_dvalid <= 0;
@@ -231,21 +197,21 @@ module swd_adiv5 # ( parameter FIFO_AW = 2 )
                    // DP[0x10] write - Handle RESET/protocol switch
                    4'b1100: begin
                       if (dato[0])
-                        `PHY_RAW (SWITCH, 60, 63, 63, {64{1'b1}})
+                        `PHY_RAW (SWITCH, 6'd60, 6'd63, 6'd63, {64{1'b1}})
                       else
-                        `PHY_RAW (DONE, 60, 63, 63, {64{1'b1}})
+                        `PHY_RAW (DONE, 6'd60, 6'd63, 6'd63, {64{1'b1}})
                    end
                  endcase // casez ({addr, APnDP, RnW})
               end
 
             // Switch to SWD
-            SWITCH:  `PHY_RAW (RESET2, 16, 63, 63, {48'h0, 16'he79e})
+            SWITCH:  `PHY_RAW (RESET2, 6'd16, 6'd63, 6'd63, {48'h0, 16'he79e})
 
             // Do additional line reset
-            RESET2:  `PHY_RAW (DONE, 62, 63, 63, {10'h0, {54{1'b1}}})
+            RESET2:  `PHY_RAW (DONE, 6'd62, 6'd63, 6'd63, {10'h0, {54{1'b1}}})
 
             // Flush after AP write
-            FLUSH:   `PHY_RAW (RESPONSE, 8, 63, 63, 64'h0)
+            FLUSH:   `PHY_RAW (RESPONSE, 6'd8, 6'd63, 6'd63, 64'h0)
 
             // Finished - return to IDLE
             DONE:
@@ -261,9 +227,9 @@ module swd_adiv5 # ( parameter FIFO_AW = 2 )
                    
                    // Retries exceeded - Issue ABORT
                    if (retries == `RETRY_MAX)
-                     `PHY_RAW (IGNORE, 46, 8, 12, 64'h20000003EA1) 
+                     `PHY_RAW (IGNORE, 6'd46, 6'd8, 6'd12, 64'h20000003EA1) 
                    // Response OK and parity OK on READ
-                   else if ((phy_resp == 3'b100) && ((^phy_dati[32:1] == phy_dati[0]) | ~RnW))
+                   else if ((phy_resp == 3'b100) && ((^PHY_RDDATA[38:7] == PHY_RDDATA[6]) | ~RnW))
                      begin
 
                         // If AP read move to read DP[0xc]
@@ -277,7 +243,7 @@ module swd_adiv5 # ( parameter FIFO_AW = 2 )
                         else
                           begin
                              // Copy data/status
-                             dati <= {<<{phy_dati[32:1]}};
+                             dati <= {<<{PHY_RDDATA[38:7]}};
                              stat <= phy_resp;
                         
                              // Write to FIFO, return to IDLE
