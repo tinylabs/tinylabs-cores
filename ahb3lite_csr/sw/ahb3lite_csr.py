@@ -4,6 +4,7 @@ from collections import OrderedDict, defaultdict
 import yaml
 import math
 import re
+import zlib
 from cppwriter import *
 
 from verilogwriter import Signal, Wire, Instance, ModulePort, VerilogWriter, LocalParam, Assign, Logic
@@ -42,6 +43,7 @@ class Field:
         self.rptr = []
         self.rtype = 'rw'
         self.count = 1
+        self.strobe = False
         for k, v in d.items ():
             if k == 'width':
                 self.width = v;
@@ -53,6 +55,8 @@ class Field:
                 self.rtype = v
             elif k == 'count':
                 self.count = int (v)
+            elif k == 'strobe':
+                self.strobe = True;
             else:
                 raise ValueError ("Unknown prop %s" % v)
     def n(self, n):
@@ -69,6 +73,10 @@ class Field:
         return self.name.upper() + '_MSK'
     def maximum(self):
         return self.name.upper() + '_MAX'
+    # return important characteristics for hashing
+    # Compared at runtime to ensure sync b/w CPP/SV
+    def __str__(self):
+        return self.name+str(self.width)+self.rtype+str(self.count)+str(self.strobe);
     
 class Reg:
     def __init__(self, rtype, address):
@@ -98,6 +106,7 @@ class CSRGen:
         d = OrderedDict()
         self.field = []
         self.reg = []
+        self.crc = 0
         import yaml
 
         def ordered_load(stream, Loader=yaml.Loader, object_pairs_hook=OrderedDict):
@@ -133,6 +142,9 @@ class CSRGen:
         # Create verilog writer
         self.verilog_writer = VerilogWriter (self.name)
         self.template_writer = VerilogWriter (self.name)
+
+        # Create crc32 reg
+        config['registers']['crc32'] = { 'type' : 'ro', 'width' : 32 }
         
         # Sort by type then width
         regs = sorted (config['registers'].items(), key=lambda x: (x[1]['type'], 32-x[1]['width']))
@@ -141,6 +153,7 @@ class CSRGen:
         rtype = 'none'
         off = 0
         addr = 0
+        pstrobe = False
         for k,v in regs:
 
             # Add field
@@ -150,13 +163,16 @@ class CSRGen:
             for n in range (f.count):
 
                 # Create new register if no more space or fields have changed
-                if v['type'] != rtype or (off + v['width']) > 32:
+                if v['type'] != rtype or (off + v['width']) > 32 or f.strobe or pstrobe:
                     r = Reg (v['type'], addr)
                     off = 0
                     addr += 4
                     rtype = v['type']
                     self.reg.append (r)
 
+                # Save previous strobe value
+                pstrobe = f.strobe
+                
                 # Save register pointer
                 f.rptr.append (RegPtr (r, off))
                 
@@ -165,6 +181,10 @@ class CSRGen:
                             
             # Add field
             self.field.append (f)
+
+        # Generate CRC
+        for f in self.field:
+            self.crc = zlib.crc32 (str(f).encode('ascii'), self.crc) & 0xffffffff;
 
         # Dump registers
         self.dump ()
@@ -189,6 +209,8 @@ class CSRGen:
         # Create input/output registers
         self.verilog_writer.add (Wire ('csri', len (self.reg), prepend='[31:0]'))
         self.verilog_writer.add (Wire ('csro', len (self.reg), prepend='[31:0]'))
+        self.verilog_writer.add (Wire ('stb', len (self.reg)))
+        self.verilog_writer.add (Wire ('crc32', 32))
 
         # Assign wiring to registers
         for f in self.field:
@@ -230,12 +252,20 @@ class CSRGen:
                                                          str(int(rptr.reg.address/4)) + '][' +
                                                          str(f.width+rptr.offset-1) + ':' + str(rptr.offset) + ']'))
 
+                if f.strobe:
+                    self.verilog_writer.add (Assign (f.name + '_stb', 'stb[' + str(int(rptr.reg.address/4)) + ']'))
+                    
+        # Add CRC
+        self.verilog_writer.add (Assign ('crc32', '32\'h' + hex (self.crc)[2:]))
+        
         # Create module
         self.verilog_writer.add(ModulePort('CLK', 'input'))
         self.verilog_writer.add(ModulePort('RESETn', 'input'))
 
         # Add all signals to module
         for f in self.field:
+            if f.name == 'crc32':
+                continue
             if f.rtype == 'rw' or f.rtype == 'w1c':
                 if (f.count == 1):
                     self.verilog_writer.add (ModulePort (f.name + '_i', 'input', f.width))
@@ -247,6 +277,9 @@ class CSRGen:
                 self.verilog_writer.add (ModulePort (f.name, 'input', f.width))
             elif f.rtype == 'wo':
                 self.verilog_writer.add (ModulePort (f.name, 'output', f.width))
+
+            if f.strobe:
+                self.verilog_writer.add (ModulePort (f.name + '_stb', 'output', f.count))
 
         # Add AHB3 ports
         for p in AHB3_MASTER_PORTS:
@@ -277,10 +310,11 @@ class CSRGen:
                   Port ('RESETn', 'RESETn'),
                   Port ('REGIN', 'csri'),
                   Port ('REGOUT', 'csro'),
+                  Port ('STROBE', 'stb'),
                   Port ('ACCESS', '{' + access + '}')]
         iports += [Port (p.name, p.name) for p in AHB3_MASTER_PORTS]
         iports += [Port (p.name, p.name) for p in AHB3_SLAVE_PORTS]
-        
+
         # Create Instance of ahb3lite_csr
         self.verilog_writer.add (Instance ('ahb3lite_csr', 'u_'+self.name, params, iports))
         self.verilog_writer.write (file)
@@ -291,6 +325,8 @@ class CSRGen:
 
         # Create signal wires
         for f in self.field:
+            if f.name == 'crc32':
+                continue
             if f.rtype == 'rw' or f.rtype == 'w1c':
                 # Add wires
                 if f.count == 1:
@@ -308,6 +344,11 @@ class CSRGen:
                 self.template_writer.add (Logic (f.name, f.width))
                 # Add ports
                 ports += [Port (f.name, f.name)]
+
+            # Add strobe connection
+            if f.strobe:
+                ports += [Port (f.name + '_stb', f.name + '_stb')]
+                self.template_writer.add (Logic (f.name + '_stb', f.count))
 
         # Insantiate custom module
         self.template_writer.add (Instance (self.name, self.name+'0', [], ports))

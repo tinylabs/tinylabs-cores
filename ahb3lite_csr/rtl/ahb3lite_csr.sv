@@ -31,7 +31,8 @@ module ahb3lite_csr
        // Registers
        input [CNT-1:0] [1:0]         ACCESS,
        input [CNT-1:0] [31:0]        REGIN,
-       output logic [CNT-1:0] [31:0] REGOUT
+       output logic [CNT-1:0] [31:0] REGOUT,
+       output logic [CNT-1:0]        STROBE
     );
 
    // AHB3 defs
@@ -77,17 +78,26 @@ module ahb3lite_csr
         else
           begin
 
+             // Strobe on access
+             if (HSEL & (HTRANS != HTRANS_BUSY) & (HTRANS != HTRANS_IDLE))
+               STROBE[sel] <= 1;
+             else
+               STROBE[sel] <= 0;
+             
              // Handle AHB writes
              if (we & (32'(sel) < CNT))
-               
-               // Switch on access mode
-               case (ACCESS[sel])
-                 2'b00: REGOUT[sel] <= wval (REGOUT[sel], HWDATA, be);
-                 2'b01: ; // RO - do nothing
-                 2'b10: REGOUT[sel] <= wval (REGOUT[sel], HWDATA, be);                  
-                 2'b11: REGOUT[sel] <= REGOUT[sel] & wval (REGOUT[sel], ~HWDATA, be);
-               endcase // case (ACCESS[sel])
+               begin
+                  
+                  // Switch on access mode
+                  case (ACCESS[sel])
+                    2'b00: REGOUT[sel] <= wval (REGOUT[sel], HWDATA, be);
+                    2'b01: ; // RO - do nothing
+                    2'b10: REGOUT[sel] <= wval (REGOUT[sel], HWDATA, be);                  
+                    2'b11: REGOUT[sel] <= REGOUT[sel] & wval (REGOUT[sel], ~HWDATA, be);
+                  endcase // case (ACCESS[sel])
 
+               end // if (we & (32'(sel) < CNT))
+             
              // Output = input unless WO or being accessed on bus
              for (int n = 0; n < CNT; n++)
                if ((ACCESS[n] != 2'b10) & ~((n == 32'(sel)) & we))
@@ -98,7 +108,7 @@ module ahb3lite_csr
                HRDATA <= 32'h0;
              else
                HRDATA <= (32'(sel) < CNT) ? REGIN[sel] : 32'hdeadbeef;                  
-             
+            
           end // if (RESETn)
      end // always @ (posedge CLK)
    
