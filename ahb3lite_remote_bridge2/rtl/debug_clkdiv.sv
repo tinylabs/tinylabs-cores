@@ -9,14 +9,13 @@
 module debug_clkdiv
   (
    input        CLKIN,
-   input        RESETn,
    input [3:0]  SEL,
    output logic CLKOUT
    );
 
    logic [8:0]  ctr;
 
-`define FLIP(v) begin if (ctr == v) begin CLKOUT <= ~CLKOUT; ctr <= 0; end else ctr <= ctr + 1; end
+`define FLIP(v) begin if (ctr == (v-1)) begin CLKOUT <= ~CLKOUT; ctr <= 0; end else ctr <= ctr + 1; end
    
    // SEL  FREQ    DIVISOR
    // 0  = 192 MHz    1

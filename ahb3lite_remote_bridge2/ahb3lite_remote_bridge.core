@@ -15,6 +15,7 @@ filesets:
             - rtl/jtag_adiv5.sv
             - rtl/swd_adiv5.sv
             - rtl/debug_mux.sv
+            - rtl/host_jtag_convert.sv
         file_type : verilogSource
 
     swd_phy:
