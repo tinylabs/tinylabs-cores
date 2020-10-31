@@ -42,6 +42,9 @@ module ahb3lite_csr
    logic                    we;  // Write enable
    logic [3:0]              be;  // Byte enable
    logic [$clog2(CNT)-1:0]  sel; // Register select
+
+   // Strobe is delayed by 1 cycle
+   logic [CNT-1:0]          strobeq;
    
    // No wait states for this core
    assign HREADYOUT = 1'b1;
@@ -80,9 +83,12 @@ module ahb3lite_csr
 
              // Strobe on access
              if (HSEL & (HTRANS != HTRANS_BUSY) & (HTRANS != HTRANS_IDLE))
-               STROBE[sel] <= 1;
+               strobeq[sel] <= 1;
              else
-               STROBE[sel] <= 0;
+               strobeq[sel] <= 0;
+
+             // Delayed one cycle
+             STROBE <= strobeq;
              
              // Handle AHB writes
              if (we & (32'(sel) < CNT))

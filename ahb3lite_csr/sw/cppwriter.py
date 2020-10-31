@@ -97,25 +97,36 @@ class CPPWriter:
                 if f.rtype != 'ro':
                     if f.count == 1:
                         s += '\tvoid ' + f.name + ' (uint32_t val) {\n'
-                        # Read
-                        s += '\t\tuint32_t p = read (base + ' + f.offset() + ');\n'
-                        # Modify
-                        s += '\t\tp &= ~(' + f.mask() + ' << ' + f.shift() + ');\n'
-                        s += '\t\tp |= ((val & ' + f.mask() + ') << ' + f.shift() + ');\n'
-                        # Write
-                        s += '\t\twrite (base + ' + f.offset() + ', p);\n'
-                        s += '\t}\n'
+                        if (f.width != 32) and (f.rtype != 'wo'):
+                            # Read
+                            s += '\t\tuint32_t p = read (base + ' + f.offset() + ');\n'
+                            # Modify
+                            s += '\t\tp &= ~(' + f.mask() + ' << ' + f.shift() + ');\n'
+                            s += '\t\tp |= ((val & ' + f.mask() + ') << ' + f.shift() + ');\n'
+                            # Write
+                            s += '\t\twrite (base + ' + f.offset() + ', p);\n'
+                            s += '\t}\n'
+                        else:
+                            # Write
+                            s += '\t\twrite (base + ' + f.offset() + ', val << ' + f.shift() + ');\n'
+                            s += '\t}\n'
+                            
                     else:
                         s += '\tvoid ' + f.name + ' (uint32_t idx, uint32_t val) {\n'
                         s += '\t\tif (idx >= ' + f.maximum() + ') return;\n'
-                        # Read
-                        s += '\t\tuint32_t p = read (base + ' + f.name + '_n[idx].off);\n'
-                        # Modify
-                        s += '\t\tp &= ~(' + f.mask() + ' << ' + f.name + '_n[idx].sht);\n'
-                        s += '\t\tp |= ((val & ' + f.mask() + ') << ' + f.name + '_n[idx].sht);\n'
-                        # Write
-                        s += '\t\twrite (base + ' + f.name + '_n[idx].off, p);\n'
-                        s += '\t}\n'
+                        if (f.width != 32) and (f.rtype != 'wo'):
+                            # Read
+                            s += '\t\tuint32_t p = read (base + ' + f.name + '_n[idx].off);\n'
+                            # Modify
+                            s += '\t\tp &= ~(' + f.mask() + ' << ' + f.name + '_n[idx].sht);\n'
+                            s += '\t\tp |= ((val & ' + f.mask() + ') << ' + f.name + '_n[idx].sht);\n'
+                            # Write
+                            s += '\t\twrite (base + ' + f.name + '_n[idx].off, p);\n'
+                            s += '\t}\n'
+                        else:
+                            # Write
+                            s += '\t\twrite (base + ' + f.name + '_n[idx].off, val << ' + f.name + '_n[idx].sht);\n'
+                            s += '\t}\n'
                         
                     
             # Close class
