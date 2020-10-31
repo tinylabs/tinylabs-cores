@@ -322,4 +322,4 @@ module jtag_adiv5 #(
           
        end // else: !if(~RESETn)
    
-endmodule; // jtag_adiv5
+endmodule // jtag_adiv5

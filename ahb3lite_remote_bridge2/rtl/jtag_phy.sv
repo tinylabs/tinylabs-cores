@@ -108,7 +108,7 @@ module jtag_phy
                              } state_t;
 
    // Represent current and target state
-   state_t      state, nstate, pstate;
+   logic [3:0]  state, nstate, pstate;
 
    // Blocking FIFO state
    logic        resp_blocked, req_blocked;

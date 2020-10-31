@@ -38,10 +38,10 @@ module debug_mux #( parameter FIFO_AW = 2 )
     input                               JTAG_RDEN,
     output                              JTAG_RDEMPTY, 
     // PHY signals
-    output logic                        TCK,
-    output logic                        TDI,
-    output logic                        TMSOUT,
-    output logic                        TMSOE,
+    output                              TCK,
+    output                              TDI,
+    output                              TMSOUT,
+    output                              TMSOE,
     input                               TDO,
     input                               TMSIN
     );

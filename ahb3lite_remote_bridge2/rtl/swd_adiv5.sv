@@ -275,4 +275,4 @@ module swd_adiv5 #(
           
        end // else: !if(~RESETn)
    
-endmodule; // swd_adiv5
+endmodule // swd_adiv5

@@ -104,7 +104,6 @@ module swd_phy
 
         if (!RESETn)
           begin
-             SWDOE <= 1;
              SWDOUT <= 0;
              busy <= 0;
              valid <= 0;
