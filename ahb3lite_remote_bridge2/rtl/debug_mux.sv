@@ -16,10 +16,11 @@ module debug_mux #( parameter FIFO_AW = 2 )
    (
     // System clock and reset
     input                               CLK,
-    input                               RESETn,
+    input                               SYS_RESETn,
     // PHY clock
     input                               PHY_CLK,
     input                               PHY_CLKn,
+    input                               PHY_RESETn,
     // Select interface
     input                               JTAGnSWD,
     // Select direct JTAG PHY interface
@@ -69,12 +70,11 @@ module debug_mux #( parameter FIFO_AW = 2 )
    logic                                jtag_TCK, jtag_TMS, jtag_TDI;
    logic                                swd_TCK, swd_TMSOUT, swd_TMSOE;
 
-   
    // MUX hardware signals
-   assign TCK = JTAGnSWD | JTAG_DIRECT ? jtag_TCK : swd_TCK;
-   assign TDI = JTAGnSWD | JTAG_DIRECT ? jtag_TDI : 1'b0;
-   assign TMSOUT = JTAGnSWD | JTAG_DIRECT ? jtag_TMS : swd_TMSOUT;
-   assign TMSOE = JTAGnSWD | JTAG_DIRECT ? 1'b1 : swd_TMSOE;
+   assign TCK    = (JTAGnSWD | JTAG_DIRECT) ? jtag_TCK : swd_TCK;
+   assign TDI    = (JTAGnSWD | JTAG_DIRECT) ? jtag_TDI : 1'b0;
+   assign TMSOUT = (JTAGnSWD | JTAG_DIRECT) ? jtag_TMS : swd_TMSOUT;
+   assign TMSOE  = (JTAGnSWD | JTAG_DIRECT) ? 1'b1 : swd_TMSOE;
 
    // MUX ADIv5 interface
    assign ADIv5_WRFULL = JTAGnSWD ? jtag_adiv5_WRFULL : swd_adiv5_WRFULL;
@@ -97,46 +97,48 @@ module debug_mux #( parameter FIFO_AW = 2 )
    // Instantiate JTAG phy
    jtag_phy #(.FIFO_AW (FIFO_AW + 1))
    u_jtag_phy (
-               .CLK      (CLK),
-               .PHY_CLK  (PHY_CLK),
-               .PHY_CLKn (PHY_CLKn),
-               .RESETn   (RESETn & (JTAGnSWD | JTAG_DIRECT)),
-               .WRDATA   (jtag_phy_WRDATA),
-               .WREN     (jtag_phy_WREN),
-               .WRFULL   (jtag_phy_WRFULL),
-               .RDDATA   (jtag_phy_RDDATA),
-               .RDEN     (jtag_phy_RDEN),
-               .RDEMPTY  (jtag_phy_RDEMPTY),
-               .TCK      (jtag_TCK),
-               .TMS      (jtag_TMS),
-               .TDI      (jtag_TDI),
-               .TDO      (TDO)
+               .CLK        (CLK),
+               .SYS_RESETn (SYS_RESETn & (JTAGnSWD | JTAG_DIRECT)),
+               .PHY_CLK    (PHY_CLK),
+               .PHY_CLKn   (PHY_CLKn),
+               .PHY_RESETn (PHY_RESETn & (JTAGnSWD | JTAG_DIRECT)),
+               .WRDATA     (jtag_phy_WRDATA),
+               .WREN       (jtag_phy_WREN),
+               .WRFULL     (jtag_phy_WRFULL),
+               .RDDATA     (jtag_phy_RDDATA),
+               .RDEN       (jtag_phy_RDEN),
+               .RDEMPTY    (jtag_phy_RDEMPTY),
+               .TCK        (jtag_TCK),
+               .TMS        (jtag_TMS),
+               .TDI        (jtag_TDI),
+               .TDO        (TDO)
                );
    
    // Instantiate SWD phy
-   swd_phy #(.FIFO_AW (FIFO_AW))
+   swd_phy #(.FIFO_AW (FIFO_AW + 1))
    u_swd_phy (
-              .CLK      (CLK),
-              .PHY_CLK  (PHY_CLK),
-              .PHY_CLKn (PHY_CLKn),
-              .RESETn   (RESETn & ~JTAGnSWD & ~JTAG_DIRECT),
-              .WRDATA   (swd_WRDATA),
-              .WREN     (swd_WREN),
-              .WRFULL   (swd_WRFULL),
-              .RDDATA   (swd_RDDATA),
-              .RDEN     (swd_RDEN),
-              .RDEMPTY  (swd_RDEMPTY),
-              .SWDCLK   (swd_TCK),
-              .SWDIN    (TMSIN),
-              .SWDOUT   (swd_TMSOUT),
-              .SWDOE    (swd_TMSOE)
+              .CLK        (CLK),
+              .SYS_RESETn (SYS_RESETn & ~JTAGnSWD & ~JTAG_DIRECT),
+              .PHY_CLK    (PHY_CLK),
+              .PHY_CLKn   (PHY_CLKn),
+              .PHY_RESETn (PHY_RESETn & ~JTAGnSWD & ~JTAG_DIRECT),
+              .WRDATA     (swd_WRDATA),
+              .WREN       (swd_WREN),
+              .WRFULL     (swd_WRFULL),
+              .RDDATA     (swd_RDDATA),
+              .RDEN       (swd_RDEN),
+              .RDEMPTY    (swd_RDEMPTY),
+              .SWDCLK     (swd_TCK),
+              .SWDIN      (TMSIN),
+              .SWDOUT     (swd_TMSOUT),
+              .SWDOE      (swd_TMSOE)
               );
 
    // Instantiate JTAG ADIv5
    jtag_adiv5 #(.FIFO_AW (FIFO_AW))
    u_jtag_adiv5 (
                  .CLK         (CLK),
-                 .RESETn      (RESETn & JTAGnSWD),
+                 .RESETn      (SYS_RESETn & JTAGnSWD & ~JTAG_DIRECT),
                  .WRDATA      (ADIv5_WRDATA),
                  .WREN        (ADIv5_WREN),
                  .WRFULL      (jtag_adiv5_WRFULL),
@@ -155,7 +157,7 @@ module debug_mux #( parameter FIFO_AW = 2 )
    swd_adiv5 #(.FIFO_AW (FIFO_AW + 1))
    u_swd_adiv5 (
                 .CLK         (CLK),
-                .RESETn      (RESETn & ~JTAGnSWD),
+                .RESETn      (SYS_RESETn & ~JTAGnSWD & ~JTAG_DIRECT),
                 .WRDATA      (ADIv5_WRDATA),
                 .WREN        (ADIv5_WREN),
                 .WRFULL      (swd_adiv5_WRFULL),
