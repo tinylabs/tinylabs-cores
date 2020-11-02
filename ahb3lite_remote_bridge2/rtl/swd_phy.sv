@@ -20,6 +20,7 @@ module swd_phy
    (
     input                CLK,
     input                PHY_CLK,
+    input                PHY_CLKn,
     input                RESETn,
     
     // FIFO interface IN
@@ -99,11 +100,12 @@ module swd_phy
    assign rden = !empty & !busy;
 
    // SWD clocks on both edges
-   always @(posedge PHY_CLK, negedge PHY_CLK)
+   always @(posedge PHY_CLK, posedge PHY_CLKn)
      begin
 
         if (!RESETn)
           begin
+             SWDOE <= 1;
              SWDOUT <= 0;
              busy <= 0;
              valid <= 0;

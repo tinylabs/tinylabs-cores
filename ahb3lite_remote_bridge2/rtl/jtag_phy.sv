@@ -30,6 +30,7 @@ module jtag_phy
     // Core signals
     input                    CLK,
     input                    PHY_CLK,
+    input                    PHY_CLKn,
     input                    RESETn,
 
     // FIFO interface IN
@@ -166,16 +167,18 @@ module jtag_phy
    // Read when data ready and in IDLE or reset
    assign rden = !empty & !dvalid & !busy;
    
-   always @(posedge PHY_CLK, negedge PHY_CLK)
+   always @(posedge PHY_CLK, posedge PHY_CLKn)
      if (!RESETn)
        begin
           TCK <= 0;
           TDI <= 0;
           TMS <= 1;
+          // Internal vars
           state  <= LOGIC_RESET;
           nstate <= LOGIC_RESET;
-          // Internal vars
+          pstate <= LOGIC_RESET;
           busy <= 0;
+          dvalid <= 0;
           resp_blocked <= 0;
           req_blocked <= 0;
           pending <= 0;
@@ -184,7 +187,7 @@ module jtag_phy
        begin
                    
           // Negative edge of phy clk
-          if (!PHY_CLK)
+          if (PHY_CLKn)
             begin
 
                // Toggle clock while enabled

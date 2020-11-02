@@ -19,6 +19,7 @@ module debug_mux #( parameter FIFO_AW = 2 )
     input                               RESETn,
     // PHY clock
     input                               PHY_CLK,
+    input                               PHY_CLKn,
     // Select interface
     input                               JTAGnSWD,
     // Select direct JTAG PHY interface
@@ -38,12 +39,12 @@ module debug_mux #( parameter FIFO_AW = 2 )
     input                               JTAG_RDEN,
     output                              JTAG_RDEMPTY, 
     // PHY signals
-    output                              TCK,
-    output                              TDI,
-    output                              TMSOUT,
-    output                              TMSOE,
-    input                               TDO,
-    input                               TMSIN
+    output logic                        TCK,
+    output logic                        TDI,
+    output logic                        TMSOUT,
+    output logic                        TMSOE,
+    input                               TMSIN,
+    input                               TDO
     );
 
    // Internal ADIv5 signals
@@ -67,7 +68,7 @@ module debug_mux #( parameter FIFO_AW = 2 )
    // Internal phy signals
    logic                                jtag_TCK, jtag_TMS, jtag_TDI;
    logic                                swd_TCK, swd_TMSOUT, swd_TMSOE;
-   
+
    
    // MUX hardware signals
    assign TCK = JTAGnSWD | JTAG_DIRECT ? jtag_TCK : swd_TCK;
@@ -98,6 +99,7 @@ module debug_mux #( parameter FIFO_AW = 2 )
    u_jtag_phy (
                .CLK      (CLK),
                .PHY_CLK  (PHY_CLK),
+               .PHY_CLKn (PHY_CLKn),
                .RESETn   (RESETn & (JTAGnSWD | JTAG_DIRECT)),
                .WRDATA   (jtag_phy_WRDATA),
                .WREN     (jtag_phy_WREN),
@@ -116,6 +118,7 @@ module debug_mux #( parameter FIFO_AW = 2 )
    u_swd_phy (
               .CLK      (CLK),
               .PHY_CLK  (PHY_CLK),
+              .PHY_CLKn (PHY_CLKn),
               .RESETn   (RESETn & ~JTAGnSWD & ~JTAG_DIRECT),
               .WRDATA   (swd_WRDATA),
               .WREN     (swd_WREN),
@@ -149,7 +152,7 @@ module debug_mux #( parameter FIFO_AW = 2 )
                  );
    
    // Instantiate SWD ADIv5
-   swd_adiv5 #(.FIFO_AW (FIFO_AW))
+   swd_adiv5 #(.FIFO_AW (FIFO_AW + 1))
    u_swd_adiv5 (
                 .CLK         (CLK),
                 .RESETn      (RESETn & ~JTAGnSWD),
