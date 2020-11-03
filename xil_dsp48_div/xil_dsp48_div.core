@@ -1,0 +1,14 @@
+CAPI=2:
+name: ::xil_dsp48_div:0.1
+
+filesets:
+    rtl:
+        files:
+            - rtl/xil_dsp48_div.sv
+        file_type: verilogSource
+
+targets:
+    default:
+        description: Hardware clock divider using Xilinx 7-series DSP48
+        filesets : [rtl]
+        
