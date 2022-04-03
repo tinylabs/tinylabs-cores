@@ -28,6 +28,4 @@ provider:
     name : github
     user : RoaLogic
     repo : memory
-    patches : [files/0001-Add-LOAD_FILE-param.patch,
-               files/0002-Vivado-RAM-config-update.patch]
     

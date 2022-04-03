@@ -32,6 +32,6 @@ provider:
     name : github
     user : RoaLogic
     repo : ahb3lite_interconnect
-    patches : [files/0001-Fix-verilator-default-route.patch,
+    patches : [files/0001-Add-default-route.patch,
                files/0002-Add-fusesoc-generators.patch,
                files/0003-Remove-recursive-function-def-for-verilator.patch]

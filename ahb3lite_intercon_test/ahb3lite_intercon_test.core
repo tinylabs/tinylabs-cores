@@ -63,7 +63,7 @@ targets:
         parameters: [build_synth=1]
         tools:
             vivado:
-                vivado-settings: /opt/xilinx/Vivado/2020.1/settings64.sh
+                #vivado-settings: /opt/xilinx/Vivado/2020.1/settings64.sh
                 part: xc7a35ticsg324-1L
 
 parameters:
