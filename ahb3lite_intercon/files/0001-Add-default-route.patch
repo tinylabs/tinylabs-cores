@@ -1,0 +1,61 @@
+From 420bdc120e365319c77cf69e6d7175ac97537dd2 Mon Sep 17 00:00:00 2001
+From: Tiny Labs Inc <elliot@tinylabs.io>
+Date: Sun, 3 Apr 2022 17:28:52 -0600
+Subject: [PATCH] Add default route
+
+---
+ rtl/verilog/ahb3lite_interconnect_master_port.sv | 16 ++++++++++++++--
+ 1 file changed, 14 insertions(+), 2 deletions(-)
+
+diff --git a/rtl/verilog/ahb3lite_interconnect_master_port.sv b/rtl/verilog/ahb3lite_interconnect_master_port.sv
+index 2b975b3..4efa4d3 100644
+--- a/rtl/verilog/ahb3lite_interconnect_master_port.sv
++++ b/rtl/verilog/ahb3lite_interconnect_master_port.sv
+@@ -145,6 +145,8 @@ module ahb3lite_interconnect_master_port #(
+ 
+   logic [SLAVES     -1:0] current_HSEL,      //current-cycle addressed slave
+                           pending_HSEL,      //pending-cycle addressed slave
++                          current_HSELx,
++                          pendinf_HSELx,
+                           error_masked_HSEL, //generate error when accessing masked slave
+                           error_no_slave;    //generate error when accessing non-mapped memory region
+   logic                   error_response;    //generate error response
+@@ -348,10 +350,10 @@ module ahb3lite_interconnect_master_port #(
+ generate
+   for (s=0; s<SLAVES; s++)
+   begin: gen_HSEL
+-      assign current_HSEL     [s] = SLAVE_MASK[s] & (mst_HTRANS != HTRANS_IDLE) &
++      assign current_HSELx    [s] = SLAVE_MASK[s] & (mst_HTRANS != HTRANS_IDLE) &
+                                       ( (mst_HADDR & slvHADDRmask[s]) == (slvHADDRbase[s] & slvHADDRmask[s]) ) &
+                                       ~error_response; //previous transaction generated an error, can not allow current transaction
+-      assign pending_HSEL     [s] = SLAVE_MASK[s] & (regHTRANS  != HTRANS_IDLE) &
++      assign pending_HSELx    [s] = SLAVE_MASK[s] & (regHTRANS  != HTRANS_IDLE) &
+                                       ( (regHADDR  & slvHADDRmask[s]) == (slvHADDRbase[s] & slvHADDRmask[s]) );
+       assign slvHSEL          [s] = access_pending ? (pending_HSEL[s]) : (mst_HSEL & current_HSEL[s]);
+ 
+@@ -365,12 +367,22 @@ generate
+   end
+ endgenerate
+ 
++  /*
++   * Ensure only one slave bit set per master. Lowest set bit will have precedence.
++   * This will prioritize lower indexed slaves and prevent overlapping memory maps
++   * from causing issues.
++   */
++  assign current_HSEL = -current_HSELx & current_HSELx;
++  assign pending_HSEL = -pending_HSELx & pending_HSELx;
++
+   /*
+    * Check if granted access
+    */
+   always @(posedge HCLK,negedge HRESETn)
+     if      (!HRESETn     ) slave_sel <= 'h0;
++    /* verilator lint_off WIDTH */
+     else if ( mst_HREADY  ) slave_sel <= onehot2int( slvHSEL );
++    /* verilator lint_on WIDTH */
+ 
+   /*
+    * Outgoing data (to slaves)
+-- 
+2.32.0
+
