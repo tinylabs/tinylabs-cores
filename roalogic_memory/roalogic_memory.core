@@ -28,4 +28,4 @@ provider:
     name : github
     user : RoaLogic
     repo : memory
-    
+    patches : [files/0001-Remove-verilator-param-lint-error.patch]

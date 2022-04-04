@@ -1,0 +1,42 @@
+From c050a4202e0813adc8d79e323bc36799ea937696 Mon Sep 17 00:00:00 2001
+From: Tiny Labs Inc <elliot@tinylabs.io>
+Date: Sun, 3 Apr 2022 17:54:04 -0600
+Subject: [PATCH] Fix verilator linting
+
+---
+ rtl/verilog/ahb3lite_sram1rw.sv | 16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
+
+diff --git a/rtl/verilog/ahb3lite_sram1rw.sv b/rtl/verilog/ahb3lite_sram1rw.sv
+index 6b91f09..d5e2986 100644
+--- a/rtl/verilog/ahb3lite_sram1rw.sv
++++ b/rtl/verilog/ahb3lite_sram1rw.sv
+@@ -173,17 +173,17 @@ module ahb3lite_sram1rw #(
+     //get number of active lanes for a 1024bit databus (max width) for this HSIZE
+     case (hsize)
+        HSIZE_B1024: full_be = {128{1'b1}};
+-       HSIZE_B512 : full_be = { 64{1'b1}};
+-       HSIZE_B256 : full_be = { 32{1'b1}};
+-       HSIZE_B128 : full_be = { 16{1'b1}};
+-       HSIZE_DWORD: full_be = {  8{1'b1}};
+-       HSIZE_WORD : full_be = {  4{1'b1}};
+-       HSIZE_HWORD: full_be = {  2{1'b1}};
+-       default    : full_be = {  1{1'b1}};
++       HSIZE_B512 : full_be = {128{1'b1}};
++       HSIZE_B256 : full_be = {128{1'b1}};
++       HSIZE_B128 : full_be = {128{1'b1}};
++       HSIZE_DWORD: full_be = {128{1'b1}};
++       HSIZE_WORD : full_be = {128{1'b1}};
++       HSIZE_HWORD: full_be = {128{1'b1}};
++       default    : full_be = {128{1'b1}};
+     endcase
+ 
+     //generate masked address
+-    haddr_masked = haddr & address_offset();
++    haddr_masked = haddr[6:0] & address_offset();
+ 
+     //create byte-enable
+     gen_be = full_be[BE_SIZE-1:0] << haddr_masked;
+-- 
+2.32.0
+

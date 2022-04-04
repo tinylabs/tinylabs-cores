@@ -34,4 +34,5 @@ provider:
     repo : ahb3lite_interconnect
     patches : [files/0001-Add-default-route.patch,
                files/0002-Add-fusesoc-generators.patch,
-               files/0003-Remove-recursive-function-def-for-verilator.patch]
+               files/0003-Remove-recursive-function-def-for-verilator.patch,
+               files/0004-Lint-off-1-delay.patch]

@@ -1,0 +1,25 @@
+From 99a8906fbd5925167d7f85300498b4d78dc3ce46 Mon Sep 17 00:00:00 2001
+From: Tiny Labs Inc <elliot@tinylabs.io>
+Date: Sun, 3 Apr 2022 17:59:25 -0600
+Subject: [PATCH] Fix blocking assignment
+
+---
+ rtl/verilog/ahb3lite_sram1rw.sv | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/rtl/verilog/ahb3lite_sram1rw.sv b/rtl/verilog/ahb3lite_sram1rw.sv
+index d5e2986..7c805f8 100644
+--- a/rtl/verilog/ahb3lite_sram1rw.sv
++++ b/rtl/verilog/ahb3lite_sram1rw.sv
+@@ -368,7 +368,7 @@ module ahb3lite_sram1rw #(
+ generate
+   if (REGISTERED_OUTPUT == "NO")
+   begin
+-      always_comb HREADYOUT <= 1'b1;
++      always_comb HREADYOUT = 1'b1;
+ 
+       always_comb HRDATA = contention ? dout_local : dout;
+   end
+-- 
+2.32.0
+

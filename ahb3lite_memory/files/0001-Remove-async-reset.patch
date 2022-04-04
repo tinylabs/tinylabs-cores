@@ -1,0 +1,25 @@
+From d5e4f2c0dc4525ce4e3a49ae6c1ceb0c1cc8fef5 Mon Sep 17 00:00:00 2001
+From: Tiny Labs Inc <elliot@tinylabs.io>
+Date: Sun, 3 Apr 2022 16:01:12 -0600
+Subject: [PATCH] Remove async reset
+
+---
+ rtl/verilog/ahb3lite_sram1rw.sv | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/rtl/verilog/ahb3lite_sram1rw.sv b/rtl/verilog/ahb3lite_sram1rw.sv
+index f2ce91c..6b91f09 100644
+--- a/rtl/verilog/ahb3lite_sram1rw.sv
++++ b/rtl/verilog/ahb3lite_sram1rw.sv
+@@ -374,7 +374,7 @@ generate
+   end
+   else
+   begin
+-      always @(posedge HCLK,negedge HRESETn)
++      always @(posedge HCLK)
+         if      (!HRESETn                          ) HREADYOUT <= 1'b1;
+ 	else if ( ahb_noseq && ahb_read & HREADYOUT) HREADYOUT <= 1'b0;
+         else                                         HREADYOUT <= 1'b1;
+-- 
+2.32.0
+

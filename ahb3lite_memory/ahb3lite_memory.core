@@ -24,4 +24,6 @@ provider:
     name : github
     user : RoaLogic
     repo : ahb3lite_memory
-    patches: [files/0001-Remove-async-reset.patch]
+    patches: [files/0001-Remove-async-reset.patch,
+              files/0002-Fix-verilator-linting.patch,
+              files/0003-Fix-blocking-assignment.patch]

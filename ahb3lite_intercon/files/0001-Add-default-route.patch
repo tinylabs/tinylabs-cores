@@ -16,7 +16,7 @@ index 2b975b3..4efa4d3 100644
    logic [SLAVES     -1:0] current_HSEL,      //current-cycle addressed slave
                            pending_HSEL,      //pending-cycle addressed slave
 +                          current_HSELx,
-+                          pendinf_HSELx,
++                          pending_HSELx,
                            error_masked_HSEL, //generate error when accessing masked slave
                            error_no_slave;    //generate error when accessing non-mapped memory region
    logic                   error_response;    //generate error response

@@ -1,0 +1,26 @@
+From c96c527fed5d12170bc8ef34e56a0eb812aafdb0 Mon Sep 17 00:00:00 2001
+From: Tiny Labs Inc <elliot@tinylabs.io>
+Date: Sun, 3 Apr 2022 17:48:03 -0600
+Subject: [PATCH] Lint off #1 delay
+
+---
+ rtl/verilog/ahb3lite_interconnect.sv | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/rtl/verilog/ahb3lite_interconnect.sv b/rtl/verilog/ahb3lite_interconnect.sv
+index b46baac..0b49d8c 100644
+--- a/rtl/verilog/ahb3lite_interconnect.sv
++++ b/rtl/verilog/ahb3lite_interconnect.sv
+@@ -249,7 +249,9 @@ module ahb3lite_interconnect #(
+ //synopsys translate_off
+ initial
+ begin
++    /* verilator lint_off STMTDLY */
+     #1;
++    /* verilator lint_on STMTDLY */
+     $display("\n\n");
+     $display ("------------------------------------------------------------");
+     $display (" ,------.                    ,--.                ,--.       ");
+-- 
+2.32.0
+

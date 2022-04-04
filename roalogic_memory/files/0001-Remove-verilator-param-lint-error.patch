@@ -1,0 +1,32 @@
+From b65abc1808a21e6f1decff73563b67941bdd3a0c Mon Sep 17 00:00:00 2001
+From: Tiny Labs Inc <elliot@tinylabs.io>
+Date: Sun, 3 Apr 2022 17:42:05 -0600
+Subject: [PATCH] Remove verilator param lint error
+
+---
+ rtl/verilog/rl_ram_1r1w.sv | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/rtl/verilog/rl_ram_1r1w.sv b/rtl/verilog/rl_ram_1r1w.sv
+index 88a2ce6..fa42bbb 100644
+--- a/rtl/verilog/rl_ram_1r1w.sv
++++ b/rtl/verilog/rl_ram_1r1w.sv
+@@ -102,6 +102,7 @@ module rl_ram_1r1w #(
+   //
+   // Module Body
+   //
++/* verilator lint_off WIDTH */
+ generate
+   if (TECHNOLOGY == "N3XS" ||
+       TECHNOLOGY == "n3xs")
+@@ -220,6 +221,7 @@ begin
+   assign dout_o = contention_reg ? din_dly : mem_dout;
+ end
+ endgenerate
++/* verilator lint_on WIDTH */
+ 
+ endmodule
+ 
+-- 
+2.32.0
+
