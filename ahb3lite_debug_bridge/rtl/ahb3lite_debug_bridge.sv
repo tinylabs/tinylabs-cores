@@ -99,9 +99,10 @@ module ahb3lite_debug_bridge
    logic [2:0]         resp_pending;
    logic [2:0]         resp_recvd;
    logic               cmd_complete;
-              
+   logic               check_resp;
+   
    // Save response from last cmd
-   adiv5_resp resp;
+   adiv5_resp_t resp;
    
    // Registers
    adiv5_ap_csw        csw;
@@ -129,7 +130,7 @@ module ahb3lite_debug_bridge
                begin
                   resp <= ADIv5_RDDATA;
                   check_resp <= 1;
-                  resp_recvd++;
+                  resp_recvd <= resp_recvd + 1;
                end
 
              // Check response just latched in
@@ -141,7 +142,12 @@ module ahb3lite_debug_bridge
 
                   // Set sticky STAT reg if failure
                   if (resp.stat != STAT_OK)
+                    begin
                        STAT <= resp.stat;
+                       // Assume TAR is no longer valid
+                       // in case it was a failed write
+                       tar <= -1;
+                    end
                end
               
              // Latch ahb data next cycle
@@ -199,7 +205,7 @@ module ahb3lite_debug_bridge
                          // If size mismatch handle that first
                          if (ahb_req_sz != csw.width)
                            begin
-                              if (bank_match (AP_ADDR_CSW))
+                              if (bank_match (sel, AP_ADDR_CSW))
                                 state <= STATE_SET_CSW;
                               else
                                 state <= STATE_SELECT_APBANK_0;
@@ -207,7 +213,7 @@ module ahb3lite_debug_bridge
                          // If TAR exact match and width is correct then access DRW
                          else if (ahb_addr == tar)
                            begin
-                              if (bank_match (AP_ADDR_DRW))
+                              if (bank_match (sel, AP_ADDR_DRW))
                                 state <= STATE_ACCESS_DRW;
                               else
                                 state <= STATE_SELECT_APBANK_0;
@@ -216,7 +222,7 @@ module ahb3lite_debug_bridge
                          else if ((ahb_req_sz != CSW_WIDTH_WORD) || (csw.autoinc == CSW_INC_SINGLE) || (ahb_addr[31:2] != tar[31:2]))
                            begin
                               // Check if bank matches TAR/CSW bank
-                              if (bank_match (AP_ADDR_TAR))
+                              if (bank_match (sel, AP_ADDR_TAR))
                                 begin
                                    if (ahb_req_sz != csw.width)
                                      state <= STATE_SET_CSW;
@@ -234,8 +240,8 @@ module ahb3lite_debug_bridge
                          else
                            begin
                               // Check apbank match
-                              if (bank_match (AP_ADDR_BD0))
-                                state <= STATE_ACCESS_Bn;
+                              if (bank_match (sel, AP_ADDR_BD0))
+                                state <= STATE_ACCESS_BDn;
                               else
                                 state <= STATE_SELECT_APBANK_1;
                            end
@@ -248,7 +254,7 @@ module ahb3lite_debug_bridge
                    begin
                       ADIv5_WRDATA <= DP_REG_READ (DP_ADDR_SELECT);
                       ADIv5_WREN <= 1;
-                      cmd_pending++;
+                      resp_pending <= resp_pending + 1;
                       state <= STATE_READ_DPSELECT;
                    end
                  else
@@ -274,13 +280,13 @@ module ahb3lite_debug_bridge
                       // from configuration before enabling bridge
                       //                       
                       // Clear dpbank - We don't use it for bridge
-                      sel.dpbank = 0;
+                      sel.dpbank <= 0;
                       // Set apbank for CSW read
-                      sel.apbank = 0;
+                      sel.apbank <= 0;
                       // Send READ_AP command
-                      ADIv5_WRDATA <= DP_REG_WRITE (DP_ADDR_SELECT);
+                      ADIv5_WRDATA <= DP_REG_WRITE (DP_ADDR_SELECT, {sel[31:8], 8'h0});
                       ADIv5_WREN <= 1;
-                      cmd_pending++;
+                      resp_pending <= resp_pending + 1;
                       state <= STATE_CACHE_APCSW;
                    end
                  else
@@ -293,7 +299,7 @@ module ahb3lite_debug_bridge
                       // Send READ_AP command
                       ADIv5_WRDATA <= AP_REG_READ (AP_ADDR_CSW);
                       ADIv5_WREN <= 1;
-                      cmd_pending++;
+                      resp_pending <= resp_pending + 1;
                       state <= STATE_READ_APCSW;
                    end
                  else
@@ -318,7 +324,7 @@ module ahb3lite_debug_bridge
                    begin
                       // Directly access DRW
                       ADIv5_WREN <= 1;
-                      cmd_pending++;
+                      resp_pending <= resp_pending + 1;
                       if (ahb_wnr)
                         begin
                            ADIv5_WRDATA <= AP_REG_WRITE (AP_ADDR_DRW, ahb_data);
@@ -338,11 +344,11 @@ module ahb3lite_debug_bridge
                  if (!ADIv5_WRFULL)
                    begin
                       ADIv5_WREN <= 1;
-                      cmd_pending++;
+                      resp_pending <= resp_pending + 1;
                       if (ahb_wnr)
-                        ADIv5_WRDATA <= AP_REG_WRITE (AP_ADDR_BD0 | ahb_addr[1:0], ahb_data);
+                        ADIv5_WRDATA <= AP_REG_WRITE (AP_ADDR_BD0 | {4'h0, ahb_addr[1:0]}, ahb_data);
                       else
-                        ADIv5_WRDATA <= AP_REG_READ (AP_ADDR_BD0 | ahb_addr[1:0]);
+                        ADIv5_WRDATA <= AP_REG_READ (AP_ADDR_BD0 | {4'h0, ahb_addr[1:0]});
                       state <= STATE_AHB_RESP;
                    end
                  else
@@ -352,10 +358,10 @@ module ahb3lite_debug_bridge
                STATE_SELECT_APBANK_0:
                  if (!ADIv5_WRFULL)
                    begin
-                      sel.apbank = 0;
-                      ADIv5_WRDATA <= DP_REG_WRITE (DP_ADDR_SELECT, sel);
+                      sel.apbank <= 0;
+                      ADIv5_WRDATA <= DP_REG_WRITE (DP_ADDR_SELECT, {sel[31:8], 4'h0, 4'h0});
                       ADIv5_WREN <= 1;
-                      cmd_pending++;
+                      resp_pending <= resp_pending + 1;
 
                       // If access size doesn't match set CSW
                       if (csw.width != ahb_req_sz)
@@ -373,13 +379,13 @@ module ahb3lite_debug_bridge
                STATE_SELECT_APBANK_1:
                  if (!ADIv5_WRFULL)
                    begin
-                      sel.apbank = 1;
-                      ADIv5_WRDATA <= DP_REG_WRITE (DP_ADDR_SELECT, sel);
+                      sel.apbank <= 1;
+                      ADIv5_WRDATA <= DP_REG_WRITE (DP_ADDR_SELECT, {sel[31:8], 4'h1, 4'h0});
                       ADIv5_WREN <= 1;
-                      cmd_pending++;
+                      resp_pending <= resp_pending + 1;
 
-                      // Access Bn banked register
-                      state <= STATE_ACCESS_Bn;
+                      // Access BDn banked register
+                      state <= STATE_ACCESS_BDn;
                    end
                  else
                    ADIv5_WREN <= 0;
@@ -388,10 +394,11 @@ module ahb3lite_debug_bridge
                STATE_SET_CSW:
                  if (!ADIv5_WRFULL)
                    begin
-                      csw.width = ahb_req_sz;
-                      ADIv5_WRDATA <= AP_REG_WRITE (AP_ADDR_CSW, csw);
+                      // Save new size
+                      csw.width <= ahb_req_sz;
+                      ADIv5_WRDATA <= AP_REG_WRITE (AP_ADDR_CSW, {csw[31:3], ahb_req_sz});
                       ADIv5_WREN <= 1;
-                      cmd_pending++;
+                      resp_pending <= resp_pending + 1;
                       // If TAR already matches
                       if (ahb_addr == tar)
                         state <= STATE_ACCESS_DRW;
@@ -406,10 +413,10 @@ module ahb3lite_debug_bridge
                STATE_SET_TAR:
                  if (!ADIv5_WRFULL)
                    begin
-                      tar = ahb_addr;
+                      tar <= ahb_addr;
                       ADIv5_WRDATA <= AP_REG_WRITE (AP_ADDR_TAR, tar);
                       ADIv5_WREN <= 1;
-                      cmd_pending++;
+                      resp_pending <= resp_pending + 1;
                       state <= STATE_ACCESS_DRW;
                    end
                  else
@@ -485,7 +492,7 @@ module ahb3lite_debug_bridge
                   ahb_wnr <= HWRITE;
 
                   // Save transaction size
-                  ahb_req_sz <= {0, HSIZE[1:0]};
+                  ahb_req_sz <= {1'b0, HSIZE[1:0]};
                        
                   // If write latch data next cycle
                   if (HWRITE)

@@ -1,0 +1,68 @@
+CAPI=2:
+name: ::arm_debug:0.1
+description: ARM debug via ADIv5 interface. Supports SWD+JTAG.
+
+filesets:
+    rtl:
+        depend:
+            - fifo
+        files:
+            - rtl/adiv5_pkg.sv
+            - rtl/swd_phy.sv
+            - rtl/jtag_phy.sv
+            - rtl/jtag_adiv5.sv
+            - rtl/swd_adiv5.sv
+            - rtl/adiv5_mux.sv
+        file_type : verilogSource
+
+    swd_phy:
+        depend:
+            - verilator_utils
+            - fifo
+        files:
+            - rtl/swd_phy.sv : {file_type : verilogSource}
+            - bench/swd_phy_tb.cpp : {file_type : cppSource}
+
+    jtag_phy:
+        depend:
+            - verilator_utils
+            - fifo
+        files: 
+           - rtl/jtag_phy.sv : {file_type : verilogSource}
+           - bench/jtag_phy_tb.cpp : {file_type : cppSource}
+            
+    debug_mux:
+        depend:
+            - verilator_utils
+        files:
+            - bench/debug_mux_tb.cpp : {file_type : cppSource}
+
+targets:
+    default:
+        filesets : [rtl]
+
+    sim: &sim
+        default_tool: verilator
+        tools:
+            verilator:
+                verilator_options: [-sv, --cc, --trace, --clk, CLK]
+                run_options: [--vcd=sim.vcd, --timeout=20000]
+                
+    swd_phy:
+        <<: *sim
+        filesets : [swd_phy]
+        description: Test SWD phy with verilator
+        toplevel: [swd_phy]
+
+    jtag_phy:
+        <<: *sim
+        filesets : [jtag_phy]
+        description: Test JTAG phy with verilator
+        toplevel: [jtag_phy]
+
+    debug_mux:
+        <<: *sim
+        filesets : [rtl, debug_mux]
+        description: Debug mux test
+        toplevel: [debug_mux]
+
