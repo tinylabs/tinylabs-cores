@@ -1,0 +1,18 @@
+CAPI=2:
+name: ::ahb3lite_debug_bridge:0.1
+description: Bridges AHB3lite to external target via ADIv5 SWD/JTAG phy
+
+filesets:
+    rtl:
+        depend:
+            - ahb3lite_pkg
+            - ahb3lite_default_slave
+            - arm_debug
+        files:
+            - rtl/ahb3lite_debug_bridge.sv
+        file_type : verilogSource
+
+targets:
+    default:
+        filesets : [rtl]
+    
