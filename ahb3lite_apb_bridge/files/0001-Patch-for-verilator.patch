@@ -1,0 +1,130 @@
+From 099cd3d079142d64acee010ad5e4586b725c07d2 Mon Sep 17 00:00:00 2001
+From: Tiny Labs Inc <elliot@tinylabs.io>
+Date: Tue, 12 Apr 2022 18:33:33 -0600
+Subject: [PATCH] Patch for verilator
+
+---
+ rtl/verilog/ahb3lite_apb_bridge.sv | 58 ++++++++++++++----------------
+ 1 file changed, 26 insertions(+), 32 deletions(-)
+
+diff --git a/rtl/verilog/ahb3lite_apb_bridge.sv b/rtl/verilog/ahb3lite_apb_bridge.sv
+index 58d4690..0bb266f 100644
+--- a/rtl/verilog/ahb3lite_apb_bridge.sv
++++ b/rtl/verilog/ahb3lite_apb_bridge.sv
+@@ -1,3 +1,4 @@
++/* verilator lint_off CASEINCOMPLETE */
+ /////////////////////////////////////////////////////////////////////
+ //   ,------.                    ,--.                ,--.          //
+ //   |  .--. ' ,---.  ,--,--.    |  |    ,---. ,---. `--' ,---.    //
+@@ -130,22 +131,15 @@ module ahb3lite_apb_bridge #(
+   initial
+   begin
+       //check if HRDATA/HWDATA/PRDATA/PWDATA are multiples of bytes
+-      a1: assert (HDATA_SIZE % 8 ==0)
+-          else $error("HDATA_SIZE must be an integer multiple of bytes (8bits)");
++     a1: assert ((HDATA_SIZE % 8) ==0);
++     a2: assert ((PDATA_SIZE % 8) ==0);
+ 
+-      a2: assert (PDATA_SIZE % 8 ==0)
+-          else $error("PDATA_SIZE must be an integer multiple of bytes (8bits)");
+ 
++     //Check if PDATA_SIZE <= HDATA_SIZE
++     a3: assert (PDATA_SIZE <= HDATA_SIZE);
+ 
+-      //Check if PDATA_SIZE <= HDATA_SIZE
+-      a3: assert (PDATA_SIZE <= HDATA_SIZE)
+-          else $error("PDATA_SIZE must be less than or equal to HDATA_SIZE (PDATA_SIZE <= HDATA_SIZE");
+-
+-
+-      //Check SYNC_DEPTH >= 3
+-      a4: assert (SYNC_DEPTH >= SYNC_DEPTH_MIN)
+-          else $warning("SYNC_DEPTH=%0d is less than minimum. Changed to %0d", SYNC_DEPTH, SYNC_DEPTH_CHK);
+-
++     //Check SYNC_DEPTH >= 3
++     a4: assert (SYNC_DEPTH >= SYNC_DEPTH_MIN);
+   end
+ 
+ 
+@@ -220,14 +214,14 @@ module ahb3lite_apb_bridge #(
+     input [2:0] hsize;
+ 
+     case (hsize)
+-       HSIZE_B1024: apb_beats = 1023/PDATA_SIZE; 
+-       HSIZE_B512 : apb_beats =  511/PDATA_SIZE;
+-       HSIZE_B256 : apb_beats =  255/PDATA_SIZE;
+-       HSIZE_B128 : apb_beats =  127/PDATA_SIZE;
+-       HSIZE_DWORD: apb_beats =   63/PDATA_SIZE;
+-       HSIZE_WORD : apb_beats =   31/PDATA_SIZE;
+-       HSIZE_HWORD: apb_beats =   15/PDATA_SIZE;
+-       default    : apb_beats =    7/PDATA_SIZE;
++       HSIZE_B1024: apb_beats = 7'(1023/PDATA_SIZE); 
++       HSIZE_B512 : apb_beats = 7'(511/PDATA_SIZE);
++       HSIZE_B256 : apb_beats = 7'(255/PDATA_SIZE);
++       HSIZE_B128 : apb_beats = 7'(127/PDATA_SIZE);
++       HSIZE_DWORD: apb_beats = 7'(63/PDATA_SIZE);
++       HSIZE_WORD : apb_beats = 7'(31/PDATA_SIZE);
++       HSIZE_HWORD: apb_beats = 7'(15/PDATA_SIZE);
++       default    : apb_beats = 7'(7/PDATA_SIZE);
+     endcase
+   endfunction //apb_beats
+ 
+@@ -253,7 +247,7 @@ module ahb3lite_apb_bridge #(
+     logic [6:0] haddr_masked;
+ 
+     //Generate masked address
+-    haddr_masked = haddr & address_mask(HDATA_SIZE);
++    haddr_masked = haddr[6:0] & address_mask(HDATA_SIZE);
+ 
+     //calculate bit-offset
+     data_offset = 8 * haddr_masked;
+@@ -270,13 +264,13 @@ module ahb3lite_apb_bridge #(
+     //get number of active lanes for a 1024bit databus (max width) for this HSIZE
+     case (hsize)
+        HSIZE_B1024: full_pstrb = {128{1'b1}}; 
+-       HSIZE_B512 : full_pstrb = { 64{1'b1}};
+-       HSIZE_B256 : full_pstrb = { 32{1'b1}};
+-       HSIZE_B128 : full_pstrb = { 16{1'b1}};
+-       HSIZE_DWORD: full_pstrb = {  8{1'b1}};
+-       HSIZE_WORD : full_pstrb = {  4{1'b1}};
+-       HSIZE_HWORD: full_pstrb = {  2{1'b1}};
+-       default    : full_pstrb = {  1{1'b1}};
++       HSIZE_B512 : full_pstrb = {128{1'b1}};
++       HSIZE_B256 : full_pstrb = {128{1'b1}};
++       HSIZE_B128 : full_pstrb = {128{1'b1}};
++       HSIZE_DWORD: full_pstrb = {128{1'b1}};
++       HSIZE_WORD : full_pstrb = {128{1'b1}};
++       HSIZE_HWORD: full_pstrb = {128{1'b1}};
++       default    : full_pstrb = {128{1'b1}};
+     endcase
+ 
+     //generate masked address
+@@ -455,7 +449,7 @@ module ahb3lite_apb_bridge #(
+                                          ((ahb_hprot & HPROT_PRIVILEGED) ? PPROT_PRIVILEGED : PPROT_NORMAL     );
+                  PADDR                <= ahb_haddr[PADDR_SIZE-1:0];
+                  PWRITE               <= ahb_hwrite;
+-                 PWDATA               <= ahb_hwdata >> data_offset(ahb_haddr);
++                 PWDATA               <= PDATA_SIZE'(ahb_hwdata >> data_offset(ahb_haddr));
+                  PSTRB                <= {PDATA_SIZE/8{ahb_hwrite}} & pstrb(ahb_hsize,ahb_haddr[PADDR_SIZE-1:0]);
+ 
+                  apb_prdata           <= 'h0;                                   //clear prdata
+@@ -476,7 +470,7 @@ module ahb3lite_apb_bridge #(
+                  apb_beat_cnt         <= apb_beat_cnt -1;
+                  apb_beat_data_offset <= apb_beat_data_offset + PDATA_SIZE;
+ 
+-                 apb_prdata           <= (apb_prdata << PDATA_SIZE) | (PRDATA << data_offset(ahb_haddr));//TODO: check/sim
++                 apb_prdata           <= (apb_prdata << PDATA_SIZE) | (HADDR_SIZE'(PRDATA) << data_offset(ahb_haddr));//TODO: check/sim
+                  apb_pslverr          <= PSLVERR;
+ 
+                  PENABLE              <= 1'b0;
+@@ -500,7 +494,7 @@ module ahb3lite_apb_bridge #(
+                       */
+                      apb_fsm       <= ST_APB_SETUP;
+ 
+-                     PADDR  <= PADDR + (1 << PDATA_SIZE/8);
++                     PADDR  <= PADDR + (PDATA_SIZE/8);
+                      PWDATA <= ahb_hwdata >> apb_beat_data_offset;
+                      PSTRB  <= {PDATA_SIZE/8{ahb_hwrite}} & pstrb(ahb_hsize,PADDR + (1 << ahb_hsize));
+                  end
+-- 
+2.32.0
+
