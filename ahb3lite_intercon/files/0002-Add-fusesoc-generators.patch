@@ -201,7 +201,7 @@ index 0000000..dc1c4fd
 +        # Declare global wires to pass to instantiation
 +        self.verilog_writer.add (LocalParam ('MASTERS', len (self.masters)))
 +        self.verilog_writer.add (LocalParam ('SLAVES', len (self.slaves)))
-+        mclog2 = max([math.ceil(math.log2(len (self.masters))), 2])
++        mclog2 = math.ceil(math.log2(len (self.masters)))
 +        self.verilog_writer.add (Wire ('mst_priority', mclog2, append=' [MASTERS]'))
 +        self.verilog_writer.add (Wire ('slv_addr_base', 32, append=' [SLAVES]'))
 +        self.verilog_writer.add (Wire ('slv_addr_mask', 32, append=' [SLAVES]'))
