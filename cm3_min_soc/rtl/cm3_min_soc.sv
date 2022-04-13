@@ -86,7 +86,7 @@ module cm3_min_soc
        .HDATA_SIZE (32),
        .TECHNOLOGY ("GENERIC"),
        .REGISTERED_OUTPUT ("NO"),
-       .LOAD_FILE (ROM_FILE)
+       .INIT_FILE (ROM_FILE)
        ) u_rom (
                 .HCLK      (CLK),
                 .HRESETn   (PORESETn),

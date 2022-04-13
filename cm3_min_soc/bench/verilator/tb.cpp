@@ -16,7 +16,7 @@
 #include <argp.h>
 #include <verilator_utils.h>
 
-#include "Vcm3_min_soc.h"
+#include "Vcm3_min_soc__Syms.h"
 
 static bool done;
 
@@ -73,8 +73,8 @@ int main(int argc, char **argv, char **env)
 
 	Vcm3_min_soc* top = new Vcm3_min_soc;
 	VerilatorUtils* utils =
-      new VerilatorUtils(top->cm3_min_soc__DOT__u_rom__DOT__ram_inst__DOT__genblk2__DOT__genblk2__DOT__ram_inst__DOT__mem_array);
-    
+      new VerilatorUtils((uint32_t *)&top->cm3_min_soc->u_rom->ram_inst->genblk1__DOT__ram_inst->mem_array);
+
 	parse_args(argc, argv, utils);
 	signal(SIGINT, INThandler);
 
@@ -88,7 +88,7 @@ int main(int argc, char **argv, char **env)
 
 		top->eval();
         top->CLK = !top->CLK;
-		utils->doJTAGServer (&top->TMS_SWDIN, &top->TDI, &top->TCK_SWDCLK, top->TDO, 0, &top->PORESETn);
+		utils->doJTAGServer (&top->TCK_SWDCLK, top->TDO, &top->TDI, &top->TMS_SWDIN, &top->PORESETn);
 
         // Trigger interrupt
         if ((utils->getTime() >= 800) && (utils->getTime() < 810))
