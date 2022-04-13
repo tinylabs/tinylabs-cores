@@ -1,14 +1,14 @@
-From 099cd3d079142d64acee010ad5e4586b725c07d2 Mon Sep 17 00:00:00 2001
+From eba3b6f0d802ee2c383e1e7275377fb34b98c225 Mon Sep 17 00:00:00 2001
 From: Tiny Labs Inc <elliot@tinylabs.io>
-Date: Tue, 12 Apr 2022 18:33:33 -0600
+Date: Wed, 13 Apr 2022 13:10:54 -0600
 Subject: [PATCH] Patch for verilator
 
 ---
- rtl/verilog/ahb3lite_apb_bridge.sv | 58 ++++++++++++++----------------
- 1 file changed, 26 insertions(+), 32 deletions(-)
+ rtl/verilog/ahb3lite_apb_bridge.sv | 70 ++++++++++++++----------------
+ 1 file changed, 32 insertions(+), 38 deletions(-)
 
 diff --git a/rtl/verilog/ahb3lite_apb_bridge.sv b/rtl/verilog/ahb3lite_apb_bridge.sv
-index 58d4690..0bb266f 100644
+index 58d4690..3db1beb 100644
 --- a/rtl/verilog/ahb3lite_apb_bridge.sv
 +++ b/rtl/verilog/ahb3lite_apb_bridge.sv
 @@ -1,3 +1,4 @@
@@ -57,7 +57,7 @@ index 58d4690..0bb266f 100644
 -       HSIZE_WORD : apb_beats =   31/PDATA_SIZE;
 -       HSIZE_HWORD: apb_beats =   15/PDATA_SIZE;
 -       default    : apb_beats =    7/PDATA_SIZE;
-+       HSIZE_B1024: apb_beats = 7'(1023/PDATA_SIZE); 
++       HSIZE_B1024: apb_beats = 7'(1023/PDATA_SIZE);
 +       HSIZE_B512 : apb_beats = 7'(511/PDATA_SIZE);
 +       HSIZE_B256 : apb_beats = 7'(255/PDATA_SIZE);
 +       HSIZE_B128 : apb_beats = 7'(127/PDATA_SIZE);
@@ -98,8 +98,31 @@ index 58d4690..0bb266f 100644
      endcase
  
      //generate masked address
-@@ -455,7 +449,7 @@ module ahb3lite_apb_bridge #(
-                                          ((ahb_hprot & HPROT_PRIVILEGED) ? PPROT_PRIVILEGED : PPROT_NORMAL     );
+@@ -427,12 +421,12 @@ module ahb3lite_apb_bridge #(
+         apb_fsm              <= ST_APB_IDLE;
+         apb_tack             <= 1'b0;
+         apb_prdata           <=  'hx;
+-        apb_beat_cnt         <=  'hx;
+-	apb_beat_data_offset <=  'hx;
+-	apb_pslverr          <= 1'bx;
++        apb_beat_cnt         <= 7'hx;
++	    apb_beat_data_offset <= 10'hx;
++	    apb_pslverr          <= 1'bx;
+ 
+         PSEL                 <= 1'b0;
+-        PPROT                <= 1'b0;
++        PPROT                <= 3'b0;
+         PADDR                <=  'h0;
+         PWRITE               <= 1'b0;
+         PENABLE              <= 1'b0;
+@@ -451,11 +445,11 @@ module ahb3lite_apb_bridge #(
+ 
+                  PSEL                 <= 1'b1;
+                  PENABLE              <= 1'b0;
+-                 PPROT                <= ((ahb_hprot & HPROT_DATA      ) ? PPROT_DATA       : PPROT_INSTRUCTION) |
+-                                         ((ahb_hprot & HPROT_PRIVILEGED) ? PPROT_PRIVILEGED : PPROT_NORMAL     );
++                 PPROT                <= (~|(ahb_hprot & HPROT_DATA      ) ? PPROT_DATA       : PPROT_INSTRUCTION) |
++                                         (~|(ahb_hprot & HPROT_PRIVILEGED) ? PPROT_PRIVILEGED : PPROT_NORMAL     );
                   PADDR                <= ahb_haddr[PADDR_SIZE-1:0];
                   PWRITE               <= ahb_hwrite;
 -                 PWDATA               <= ahb_hwdata >> data_offset(ahb_haddr);
