@@ -17,12 +17,12 @@ module cm3_min_soc
      input        PORESETn,
      
      // JTAG/SWD
-     input        TCK_SWDCLK,
+     input        TCK,
      input        TDI,
-     input        TMS_SWDIN,
+     input        TMSIN,
      output       TDO,
-     output       SWDOUT,
-     output       SWDOUTEN,
+     output       TMSOUT,
+     output       TMSOE,
 
      // 8-bit GPIO port
      output logic [7:0] GPIO_O,
@@ -232,10 +232,10 @@ module cm3_min_soc
             .INTNMI       (1'b0),
             
             // Debug
-            .SWCLKTCK     (TCK_SWDCLK),
-            .SWDITMS      (TMS_SWDIN),
-            .SWDO         (SWDOUT),
-            .SWDOEN       (SWDOUTEN),
+            .SWCLKTCK     (TCK),
+            .SWDITMS      (TMSIN),
+            .SWDO         (TMSOUT),
+            .SWDOEN       (TMSOE),
             .nTRST        (1'b1),
             .TDI          (TDI),
             .TDO          (TDO),

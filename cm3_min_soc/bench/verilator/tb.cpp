@@ -88,7 +88,7 @@ int main(int argc, char **argv, char **env)
 
 		top->eval();
         top->CLK = !top->CLK;
-		utils->doJTAGServer (&top->TCK_SWDCLK, top->TDO, &top->TDI, &top->TMS_SWDIN, &top->PORESETn);
+        utils->doJTAGServer (&top->TCK, top->TDO, &top->TDI, top->TMSOE ? &top->TMSOUT : &top->TMSIN, &top->PORESETn);
 
         // Trigger interrupt
         if ((utils->getTime() >= 800) && (utils->getTime() < 810))

@@ -71,7 +71,7 @@ void Server::Send (int sockfd, char *buf, int len)
 
 void Server::Listen (void)
 {
-  int nsockfd, n, i;
+  int nsockfd, n, i, enable = 1;
   socklen_t clilen;
   char cmd[256], resp[256];
   struct sockaddr_in serv_addr, cli_addr;
@@ -84,7 +84,9 @@ void Server::Listen (void)
   if (sockfd < 0) {
     fail("ERROR opening socket");
   }
-   
+  if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) < 0)
+    fail("setsockopt(SO_REUSEADDR) failed");
+ 
   /* Initialize socket structure */
   bzero((char *) &serv_addr, sizeof(serv_addr));
   serv_addr.sin_family = AF_INET;
