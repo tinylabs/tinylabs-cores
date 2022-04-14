@@ -20,6 +20,10 @@ module ahb3lite_debug_bridge
 
     // Side channel stat if failure
     output logic [2:0]                 STAT,
+
+    // Select AP - Required as DPv1+ does
+    // not allow reading of DP-SELECT
+    input [7:0]                        APSEL,
     
     // Transparent AHB slave bridge
     input                              HREADY,
@@ -69,19 +73,17 @@ module ahb3lite_debug_bridge
    typedef enum logic [4:0] {
                              STATE_DISABLED,        // 0: Interface disabled
                              STATE_IDLE,            // 1: Waiting for command
-                             STATE_CACHE_DPSELECT,  // 2: 2-6 are caching 
-                             STATE_READ_DPSELECT,   // 3: DPSELECT and APCSW
-                             STATE_WRITE_DPSELECT,  // 4: during enable.
-                             STATE_CACHE_APCSW,     // 5:
-                             STATE_READ_APCSW,      // 6:
-                             STATE_ACCESS_DRW,      // 7: Read/Write DRW
-                             STATE_ACCESS_BDn,      // 8: Read/Write BD[0-3]
-                             STATE_SELECT_APBANK_0, // 9:
-                             STATE_SELECT_APBANK_1, // 10:
-                             STATE_SET_CSW,         // 11:
-                             STATE_SET_TAR,         // 12:
-                             STATE_AHB_RESP,        // 13:
-                             STATE_AHB_ERROR_WAIT   // 14:
+                             STATE_WRITE_DPSELECT,  // 2: during enable.
+                             STATE_CACHE_APCSW,     // 3:
+                             STATE_READ_APCSW,      // 4:
+                             STATE_ACCESS_DRW,      // 5: Read/Write DRW
+                             STATE_ACCESS_BDn,      // 6: Read/Write BD[0-3]
+                             STATE_SELECT_APBANK_0, // 7:
+                             STATE_SELECT_APBANK_1, // 8:
+                             STATE_SET_CSW,         // 9:
+                             STATE_SET_TAR,         // 10:
+                             STATE_AHB_RESP,        // 11:
+                             STATE_AHB_ERROR_WAIT   // 12:
                              } brg_state_t;
    brg_state_t state;
  
@@ -164,9 +166,9 @@ module ahb3lite_debug_bridge
                STATE_DISABLED:
                  begin
 
-                    // Once enabled cache DP_SEL and AP_CSW
+                    // Once enabled write DP_SEL and cache AP_CSW
                     if (ENABLE)
-                      state <= STATE_CACHE_DPSELECT;
+                      state <= STATE_WRITE_DPSELECT;
                     else
                       begin
                          // Reset all variables
@@ -247,30 +249,6 @@ module ahb3lite_debug_bridge
                            end
                       end
                  end // case: STATE_IDLE
-
-               // Cache DP_SELECT
-               STATE_CACHE_DPSELECT:
-                 if (!ADIv5_WRFULL)
-                   begin
-                      ADIv5_WRDATA <= DP_REG_READ (DP_ADDR_SELECT);
-                      ADIv5_WREN <= 1;
-                      resp_pending <= resp_pending + 1;
-                      state <= STATE_READ_DPSELECT;
-                   end
-                 else
-                   ADIv5_WREN <= 0;
-
-               // Save DP-SEL, inherit configured values
-               STATE_READ_DPSELECT:
-                 begin
-                    ADIv5_WREN <= 0;                    
-                    if (cmd_complete)
-                      begin
-                         // Save select register
-                         sel <= resp.data;
-                         state <= STATE_WRITE_DPSELECT;
-                      end
-                 end
                
                // Write DP Select
                STATE_WRITE_DPSELECT:
@@ -283,8 +261,9 @@ module ahb3lite_debug_bridge
                       sel.dpbank <= 0;
                       // Set apbank for CSW read
                       sel.apbank <= 0;
+                      sel.apsel <= APSEL;                      
                       // Send READ_AP command
-                      ADIv5_WRDATA <= DP_REG_WRITE (DP_ADDR_SELECT, {sel[31:8], 8'h0});
+                      ADIv5_WRDATA <= DP_REG_WRITE (DP_ADDR_SELECT, {APSEL, sel[23:8], 8'h0});
                       ADIv5_WREN <= 1;
                       resp_pending <= resp_pending + 1;
                       state <= STATE_CACHE_APCSW;
