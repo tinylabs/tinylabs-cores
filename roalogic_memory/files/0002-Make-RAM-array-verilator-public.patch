@@ -1,0 +1,25 @@
+From 3bc6d8fd53fb3624e761fd59b0260fc7eabb0abb Mon Sep 17 00:00:00 2001
+From: Tiny Labs Inc <elliot@tinylabs.io>
+Date: Wed, 13 Apr 2022 13:45:58 -0600
+Subject: [PATCH] Make RAM array verilator public
+
+---
+ rtl/verilog/rl_ram_1r1w_generic.sv | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/rtl/verilog/rl_ram_1r1w_generic.sv b/rtl/verilog/rl_ram_1r1w_generic.sv
+index 6a83fab..0271a94 100644
+--- a/rtl/verilog/rl_ram_1r1w_generic.sv
++++ b/rtl/verilog/rl_ram_1r1w_generic.sv
+@@ -90,7 +90,7 @@ module rl_ram_1r1w_generic #(
+   //
+   genvar i;
+ 
+-  logic [DBITS-1:0] mem_array [2**ABITS -1:0];  //memory array
++  logic [DBITS-1:0] mem_array [2**ABITS -1:0] /* verilator public */;  //memory array
+ 
+ 
+   //////////////////////////////////////////////////////////////////
+-- 
+2.32.0
+
