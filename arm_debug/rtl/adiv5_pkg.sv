@@ -114,26 +114,26 @@ package adiv5_pkg;
    endfunction // bank_match
       
    // Function for generating ADIv5 commands
-   function adiv5_cmd_t AP_REG_WRITE(adiv5_ap_addr addr, logic [31:0] data);
+   function adiv5_cmd_t AP_REG_WRITE(logic [5:0] addr, logic [31:0] data);
       AP_REG_WRITE.addr = addr[1:0];
       AP_REG_WRITE.data = data;
       AP_REG_WRITE.APnDP = 1;
       AP_REG_WRITE.RnW = 0;      
    endfunction // AP_REG_WRITE
 
-   function adiv5_cmd_t AP_REG_READ(adiv5_ap_addr addr);
+   function adiv5_cmd_t AP_REG_READ(logic [5:0] addr);
       AP_REG_READ.addr = addr[1:0];
       AP_REG_READ.APnDP = 1;
       AP_REG_READ.RnW = 1;
    endfunction // AP_REG_READ
 
-   function adiv5_cmd_t DP_REG_READ(adiv5_dp_addr addr);
+   function adiv5_cmd_t DP_REG_READ(logic [1:0] addr);
       DP_REG_READ.addr = addr[1:0];
       DP_REG_READ.APnDP = 0;
       DP_REG_READ.RnW = 1;      
    endfunction // DP_REG_READ
 
-   function adiv5_cmd_t DP_REG_WRITE(adiv5_dp_addr addr, logic [31:0] data);
+   function adiv5_cmd_t DP_REG_WRITE(logic [1:0] addr, logic [31:0] data);
       DP_REG_WRITE.addr = addr[1:0];
       DP_REG_WRITE.data = data;
       DP_REG_WRITE.APnDP = 0;

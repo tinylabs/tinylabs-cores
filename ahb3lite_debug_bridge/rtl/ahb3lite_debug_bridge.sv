@@ -374,7 +374,7 @@ module ahb3lite_debug_bridge
             if (!ADIv5_WRFULL)
               begin
                  // Save new size
-                 csw.width <= ahb_req_sz;
+                 csw.width <= csw_f_width'(ahb_req_sz);
                  ADIv5_WRDATA <= AP_REG_WRITE (AP_ADDR_CSW, {csw[31:3], ahb_req_sz});
                  ADIv5_WREN <= 1;
                  resp_pending <= resp_pending + 1;
