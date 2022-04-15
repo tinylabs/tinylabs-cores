@@ -80,12 +80,12 @@ targets:
         description: Simulate CM3 SoC using verilator
         default_tool: verilator
         filesets_append: [verilator_tb]
-        parameters: [XILINX_ENC_CM3=0,ROM_SZ=1024,RAM_SZ=1024,ROM_FILE=../src/cm3_min_soc_0.1/fw/blinky.hex]
+        parameters: [XILINX_ENC_CM3=0,ROM_SZ=1024,RAM_SZ=1024,ROM_FILE]
         toplevel: [cm3_min_soc]
         tools:
             verilator:
                 verilator_options: [-sv, --cc, --trace, --clk, CLK]
-                #make_options: [OPT_FAST=-Ofast]
+                make_options: [OPT=-O3]
                 run_options: [--timeout=1]
 
     arty:

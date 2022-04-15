@@ -70,7 +70,7 @@ module ahb3lite_debug_bridge
                       );
    
    // State machine
-   typedef enum logic [4:0] {
+   typedef enum logic [3:0] {
                              STATE_DISABLED,        // 0: Interface disabled
                              STATE_IDLE,            // 1: Waiting for command
                              STATE_WRITE_DPSELECT,  // 2: during enable.
@@ -88,7 +88,6 @@ module ahb3lite_debug_bridge
    brg_state_t state;
  
    // AHB interface
-   logic [31:0]        ahb_tar;        // Cache of tar value
    logic [31:0]        ahb_addr;       // AHB address to access
    logic [31:0]        ahb_data;       // data to read/write
    logic               ahb_wnr;        // Write=1 Read=0
@@ -120,7 +119,7 @@ module ahb3lite_debug_bridge
    // Remote AHB bridge
    always @(posedge CLK)
      begin
-        if (!ENABLE)
+        if (!ENABLE | !RESETn)
           state <= STATE_DISABLED;
 
         // Main processing
@@ -129,11 +128,7 @@ module ahb3lite_debug_bridge
 
              // Latch data
              if (ADIv5_RDEN)
-               begin
-                  resp <= ADIv5_RDDATA;
-                  check_resp <= 1;
-                  resp_recvd <= resp_recvd + 1;
-               end
+               check_resp <= 1;
 
              // Check response just latched in
              if (check_resp)
@@ -142,11 +137,15 @@ module ahb3lite_debug_bridge
                   if (!ADIv5_RDEN)
                     check_resp <= 0;
 
+                  // Get response
+                  resp <= ADIv5_RDDATA;
+                  resp_recvd <= resp_recvd + 1;
+
                   // Set sticky STAT reg if failure
-                  if (resp.stat != STAT_OK)
+                  if (ADIv5_RDDATA[2:0] != STAT_OK)
                     begin
-                       STAT <= resp.stat;
-                       // Assume TAR is no longer valid
+                       STAT <= ADIv5_RDDATA[2:0];
+                       // Assume TAR is no longer valid if autoinc
                        // in case it was a failed write
                        tar <= -1;
                     end
@@ -159,329 +158,325 @@ module ahb3lite_debug_bridge
                   ahb_data <= HWDATA;
                   ahb_latch_data <= 0;
                end                    
+          end // else: !if(~ENABLE | ~RESETn)
+        
+        // State machine
+        case (state)
 
-             // State machine
-             case (state)
+          STATE_DISABLED:
+            begin
 
-               STATE_DISABLED:
+               // Once enabled write DP_SEL and cache AP_CSW
+               if (ENABLE)
+                 state <= STATE_WRITE_DPSELECT;
+               else
                  begin
-
-                    // Once enabled write DP_SEL and cache AP_CSW
-                    if (ENABLE)
-                      state <= STATE_WRITE_DPSELECT;
-                    else
-                      begin
-                         // Reset all variables
-                         ahb_tar <= -1;
-                         ahb_addr <= -1;
-                         ahb_pending <= 0;
-                         ahb_latch_data <= 0;
-                         resp_pending <= 0;
-                         resp_recvd <= 0;
-                         check_resp <= 0;
-                         slv_HREADYOUT <= 1;
-                         STAT <= STAT_OK;
-                         ADIv5_WREN <= 0;
-                      end
+                    // Reset all variables
+                    tar <= -1;
+                    ahb_addr <= -1;
+                    ahb_pending <= 0;
+                    ahb_latch_data <= 0;
+                    resp_pending <= 0;
+                    resp_recvd <= 0;
+                    check_resp <= 0;
+                    slv_HREADYOUT <= 1;
+                    STAT <= STAT_OK;
+                    ADIv5_WREN <= 0;
                  end
-
-               STATE_IDLE:
+            end
+          
+          STATE_IDLE:
+            begin
+               
+               // No current error
+               slv_HRESP <= HRESP_OKAY;
+               
+               // Complete AHB transaction
+               if (ahb_pending)
                  begin
-
-                    // No current error
-                    slv_HRESP <= HRESP_OKAY;
-
-                    // Complete AHB transaction
-                    if (ahb_pending)
+                    
+                    // Clear pending
+                    ahb_pending <= 0;
+                    
+                    // Determine how to most efficiently handle the request
+                    // This is actually a somewhat complicated decision tree.
+                    // NOTE: This causes a wait state which is necessary for
+                    // the case where we are writing directly to DRW. AHB
+                    // data will latch in parallel to this state.
+                    
+                    // If size mismatch handle that first
+                    if (ahb_req_sz != csw.width)
                       begin
-
-                         // Clear pending
-                         ahb_pending <= 0;
-                       
-                         // Determine how to most efficiently handle the request
-                         // This is actually a somewhat complicated decision tree.
-                         // NOTE: This causes a wait state which is necessary for
-                         // the case where we are writing directly to DRW. AHB
-                         // data will latch in parallel to this state.
-
-                         // If size mismatch handle that first
-                         if (ahb_req_sz != csw.width)
+                         if (bank_match (sel, AP_ADDR_CSW))
+                           state <= STATE_SET_CSW;
+                         else
+                           state <= STATE_SELECT_APBANK_0;
+                      end
+                    // If TAR exact match and width is correct then access DRW
+                    else if (ahb_addr == tar)
+                      begin
+                         if (bank_match (sel, AP_ADDR_DRW))
+                           state <= STATE_ACCESS_DRW;
+                         else
+                           state <= STATE_SELECT_APBANK_0;
+                      end
+                    // BDn not consistent with autoinc or non-word width
+                    else if ((ahb_req_sz != CSW_WIDTH_WORD) || (csw.autoinc == CSW_INC_SINGLE) || (ahb_addr[31:2] != tar[31:2]))
+                      begin
+                         // Check if bank matches TAR/CSW bank
+                         if (bank_match (sel, AP_ADDR_TAR))
                            begin
-                              if (bank_match (sel, AP_ADDR_CSW))
+                              if (ahb_req_sz != csw.width)
                                 state <= STATE_SET_CSW;
                               else
-                                state <= STATE_SELECT_APBANK_0;
+                                state <= STATE_SET_TAR;
                            end
-                         // If TAR exact match and width is correct then access DRW
-                         else if (ahb_addr == tar)
-                           begin
-                              if (bank_match (sel, AP_ADDR_DRW))
-                                state <= STATE_ACCESS_DRW;
-                              else
-                                state <= STATE_SELECT_APBANK_0;
-                           end
-                         // BDn not consistent with autoinc or non-word width
-                         else if ((ahb_req_sz != CSW_WIDTH_WORD) || (csw.autoinc == CSW_INC_SINGLE) || (ahb_addr[31:2] != tar[31:2]))
-                           begin
-                              // Check if bank matches TAR/CSW bank
-                              if (bank_match (sel, AP_ADDR_TAR))
-                                begin
-                                   if (ahb_req_sz != csw.width)
-                                     state <= STATE_SET_CSW;
-                                   else
-                                     state <= STATE_SET_TAR;
-                                end
-                              else
-                                state <= STATE_SELECT_APBANK_0;
-                           end
-                         // Banked access possible
-                         // If we get here:
-                         // width = WORD
-                         // banked access within TAR
-                         // Auto-increment is OFF
                          else
-                           begin
-                              // Check apbank match
-                              if (bank_match (sel, AP_ADDR_BD0))
-                                state <= STATE_ACCESS_BDn;
-                              else
-                                state <= STATE_SELECT_APBANK_1;
-                           end
+                           state <= STATE_SELECT_APBANK_0;
                       end
-                 end // case: STATE_IDLE
-               
-               // Write DP Select
-               STATE_WRITE_DPSELECT:
-                 if (!ADIv5_WRFULL)
-                   begin
-                      // Note: We don't change APSEL. That's inherited
-                      // from configuration before enabling bridge
-                      //                       
-                      // Clear dpbank - We don't use it for bridge
-                      sel.dpbank <= 0;
-                      // Set apbank for CSW read
-                      sel.apbank <= 0;
-                      sel.apsel <= APSEL;                      
-                      // Send READ_AP command
-                      ADIv5_WRDATA <= DP_REG_WRITE (DP_ADDR_SELECT, {APSEL, sel[23:8], 8'h0});
-                      ADIv5_WREN <= 1;
-                      resp_pending <= resp_pending + 1;
-                      state <= STATE_CACHE_APCSW;
-                   end
-                 else
-                   ADIv5_WREN <= 0;
-
-               // Cache AP_CSW
-               STATE_CACHE_APCSW:
-                 if (!ADIv5_WRFULL)
-                   begin
-                      // Send READ_AP command
-                      ADIv5_WRDATA <= AP_REG_READ (AP_ADDR_CSW);
-                      ADIv5_WREN <= 1;
-                      resp_pending <= resp_pending + 1;
-                      state <= STATE_READ_APCSW;
-                   end
-                 else
-                   ADIv5_WREN <= 0;
-
-               // Save CSW reg - inherit configured values
-               STATE_READ_APCSW:
-                 begin
-                    ADIv5_WREN <= 0;
-                    if (cmd_complete)
+                    // Banked access possible
+                    // If we get here:
+                    // width = WORD
+                    // banked access within TAR
+                    // Auto-increment is OFF
+                    else
                       begin
-                         // Save CSW
-                         csw <= resp.data;
-                         // Put into IDLE
+                         // Check apbank match
+                         if (bank_match (sel, AP_ADDR_BD0))
+                           state <= STATE_ACCESS_BDn;
+                         else
+                           state <= STATE_SELECT_APBANK_1;
+                      end
+                 end
+            end // case: STATE_IDLE
+          
+          // Write DP Select
+          STATE_WRITE_DPSELECT:
+            if (!ADIv5_WRFULL)
+              begin
+                 // Note: We don't change APSEL. That's inherited
+                 // from configuration before enabling bridge
+                 //                       
+                 // Clear dpbank - We don't use it for bridge
+                 sel.dpbank <= 0;
+                 // Set apbank for CSW read
+                 sel.apbank <= 0;
+                 sel.apsel <= APSEL;                      
+                 // Send READ_AP command
+                 ADIv5_WRDATA <= DP_REG_WRITE (DP_ADDR_SELECT, {APSEL, sel[23:8], 8'h0});
+                 ADIv5_WREN <= 1;
+                 resp_pending <= resp_pending + 1;
+                 state <= STATE_CACHE_APCSW;
+              end
+            else
+              ADIv5_WREN <= 0;
+          
+          // Cache AP_CSW
+          STATE_CACHE_APCSW:
+            if (!ADIv5_WRFULL)
+              begin
+                 // Send READ_AP command
+                 ADIv5_WRDATA <= AP_REG_READ (AP_ADDR_CSW);
+                 ADIv5_WREN <= 1;
+                 resp_pending <= resp_pending + 1;
+                 state <= STATE_READ_APCSW;
+              end
+            else
+              ADIv5_WREN <= 0;
+          
+          // Save CSW reg - inherit configured values
+          STATE_READ_APCSW:
+            begin
+               ADIv5_WREN <= 0;
+               if (cmd_complete)
+                 begin
+                    // Save CSW
+                    csw <= resp.data;
+                    // Put into IDLE
+                    state <= STATE_IDLE;
+                 end
+            end
+          
+          // Access DRW directly
+          STATE_ACCESS_DRW:
+            if (!ADIv5_WRFULL)
+              begin
+                 // Directly access DRW
+                 ADIv5_WREN <= 1;
+                 resp_pending <= resp_pending + 1;
+                 if (ahb_wnr)
+                   begin
+                      ADIv5_WRDATA <= AP_REG_WRITE (AP_ADDR_DRW, ahb_data);
+                      // Increment TAR if enabled
+                      if (csw.autoinc == CSW_INC_SINGLE)
+                        tar <= tar + (1 << csw.width);
+                   end
+                 else
+                   ADIv5_WRDATA <= AP_REG_READ (AP_ADDR_DRW);
+                 state <= STATE_AHB_RESP;
+              end
+            else
+              ADIv5_WREN <= 0;
+          
+          // Access banked BDn register
+          STATE_ACCESS_BDn:
+            if (!ADIv5_WRFULL)
+              begin
+                 ADIv5_WREN <= 1;
+                 resp_pending <= resp_pending + 1;
+                 if (ahb_wnr)
+                   ADIv5_WRDATA <= AP_REG_WRITE (AP_ADDR_BD0 | {4'h0, ahb_addr[1:0]}, ahb_data);
+                 else
+                   ADIv5_WRDATA <= AP_REG_READ (AP_ADDR_BD0 | {4'h0, ahb_addr[1:0]});
+                 state <= STATE_AHB_RESP;
+              end
+            else
+              ADIv5_WREN <= 0;
+          
+          // Switch to apbank 0
+          STATE_SELECT_APBANK_0:
+            if (!ADIv5_WRFULL)
+              begin
+                 sel.apbank <= 0;
+                 ADIv5_WRDATA <= DP_REG_WRITE (DP_ADDR_SELECT, {sel[31:8], 4'h0, 4'h0});
+                 ADIv5_WREN <= 1;
+                 resp_pending <= resp_pending + 1;
+                 
+                 // If access size doesn't match set CSW
+                 if (csw.width != ahb_req_sz)
+                   state <= STATE_SET_CSW;
+                 else if (ahb_addr == tar)
+                   state <= STATE_ACCESS_DRW;
+                 // Otherwise set TAR
+                 else
+                   state <= STATE_SET_TAR;
+              end
+            else
+              ADIv5_WREN <= 0;
+          
+          // Switch to apbank 1
+          STATE_SELECT_APBANK_1:
+            if (!ADIv5_WRFULL)
+              begin
+                 sel.apbank <= 1;
+                 ADIv5_WRDATA <= DP_REG_WRITE (DP_ADDR_SELECT, {sel[31:8], 4'h1, 4'h0});
+                 ADIv5_WREN <= 1;
+                 resp_pending <= resp_pending + 1;
+                 
+                 // Access BDn banked register
+                 state <= STATE_ACCESS_BDn;
+              end
+            else
+              ADIv5_WREN <= 0;
+               
+          // Set CSW width
+          STATE_SET_CSW:
+            if (!ADIv5_WRFULL)
+              begin
+                 // Save new size
+                 csw.width <= ahb_req_sz;
+                 ADIv5_WRDATA <= AP_REG_WRITE (AP_ADDR_CSW, {csw[31:3], ahb_req_sz});
+                 ADIv5_WREN <= 1;
+                 resp_pending <= resp_pending + 1;
+                 // If TAR already matches
+                 if (ahb_addr == tar)
+                   state <= STATE_ACCESS_DRW;
+                 // else set TAR
+                 else
+                   state <= STATE_SET_TAR;
+              end
+            else
+              ADIv5_WREN <= 0;
+          
+          // Set TAR address
+          STATE_SET_TAR:
+            if (!ADIv5_WRFULL)
+              begin
+                 tar <= ahb_addr;
+                 ADIv5_WRDATA <= AP_REG_WRITE (AP_ADDR_TAR, ahb_addr);
+                 ADIv5_WREN <= 1;
+                 resp_pending <= resp_pending + 1;
+                 state <= STATE_ACCESS_DRW;
+              end
+            else
+              ADIv5_WREN <= 0;
+          
+          // Return response to AHB master
+          STATE_AHB_RESP:
+            begin
+               // Done issuing commands
+               ADIv5_WREN <= 0;
+               
+               // Wait until all responses received
+               if (cmd_complete)
+                 begin
+                    
+                    // Latch read data onto AHB3 bus
+                    if (!ahb_wnr)
+                      slv_HRDATA <= resp.data;
+                    
+                    // Set response as OKAY/ERROR
+                    if (STAT != STAT_OK)
+                      begin
+                         // Signal error
+                         slv_HRESP <= HRESP_ERROR;
+                         
+                         // Go to wait state for one cycle
+                         state <= STATE_AHB_ERROR_WAIT;
+                      end
+                    else
+                      begin
+                         slv_HRESP <= HRESP_OKAY;
+                         
+                         // De-assert HREADYOUT
+                         slv_HREADYOUT <= 1;
+                         
+                         // Put back in IDLE state
                          state <= STATE_IDLE;
                       end
                  end
-               
-               // Access DRW directly
-               STATE_ACCESS_DRW:
-                 if (!ADIv5_WRFULL)
-                   begin
-                      // Directly access DRW
-                      ADIv5_WREN <= 1;
-                      resp_pending <= resp_pending + 1;
-                      if (ahb_wnr)
-                        begin
-                           ADIv5_WRDATA <= AP_REG_WRITE (AP_ADDR_DRW, ahb_data);
-                           // Increment TAR if enabled
-                           if (csw.autoinc == CSW_INC_SINGLE)
-                             tar <= tar + (1 << csw.width);
-                        end
-                      else
-                        ADIv5_WRDATA <= AP_REG_READ (AP_ADDR_DRW);
-                      state <= STATE_AHB_RESP;
-                   end
-                 else
-                   ADIv5_WREN <= 0;
+            end // case: STATE_AHB_RESP
+          
+          // HRESP must be asserted for two cycles during an error
+          STATE_AHB_ERROR_WAIT:
+            begin
+               slv_HREADYOUT <= 1;
+               state <= STATE_IDLE;
+            end
+          
+          // Should never get here
+          default:
+            state <= STATE_DISABLED;
+          
+        endcase // case (state)
 
-               // Access banked BDn register
-               STATE_ACCESS_BDn:
-                 if (!ADIv5_WRFULL)
-                   begin
-                      ADIv5_WREN <= 1;
-                      resp_pending <= resp_pending + 1;
-                      if (ahb_wnr)
-                        ADIv5_WRDATA <= AP_REG_WRITE (AP_ADDR_BD0 | {4'h0, ahb_addr[1:0]}, ahb_data);
-                      else
-                        ADIv5_WRDATA <= AP_REG_READ (AP_ADDR_BD0 | {4'h0, ahb_addr[1:0]});
-                      state <= STATE_AHB_RESP;
-                   end
-                 else
-                   ADIv5_WREN <= 0;
-               
-               // Switch to apbank 0
-               STATE_SELECT_APBANK_0:
-                 if (!ADIv5_WRFULL)
-                   begin
-                      sel.apbank <= 0;
-                      ADIv5_WRDATA <= DP_REG_WRITE (DP_ADDR_SELECT, {sel[31:8], 4'h0, 4'h0});
-                      ADIv5_WREN <= 1;
-                      resp_pending <= resp_pending + 1;
-
-                      // If access size doesn't match set CSW
-                      if (csw.width != ahb_req_sz)
-                        state <= STATE_SET_CSW;
-                      else if (ahb_addr == tar)
-                        state <= STATE_ACCESS_DRW;
-                      // Otherwise set TAR
-                      else
-                        state <= STATE_SET_TAR;
-                   end
-                 else
-                   ADIv5_WREN <= 0;
-               
-               // Switch to apbank 1
-               STATE_SELECT_APBANK_1:
-                 if (!ADIv5_WRFULL)
-                   begin
-                      sel.apbank <= 1;
-                      ADIv5_WRDATA <= DP_REG_WRITE (DP_ADDR_SELECT, {sel[31:8], 4'h1, 4'h0});
-                      ADIv5_WREN <= 1;
-                      resp_pending <= resp_pending + 1;
-
-                      // Access BDn banked register
-                      state <= STATE_ACCESS_BDn;
-                   end
-                 else
-                   ADIv5_WREN <= 0;
-               
-               // Set CSW width
-               STATE_SET_CSW:
-                 if (!ADIv5_WRFULL)
-                   begin
-                      // Save new size
-                      csw.width <= ahb_req_sz;
-                      ADIv5_WRDATA <= AP_REG_WRITE (AP_ADDR_CSW, {csw[31:3], ahb_req_sz});
-                      ADIv5_WREN <= 1;
-                      resp_pending <= resp_pending + 1;
-                      // If TAR already matches
-                      if (ahb_addr == tar)
-                        state <= STATE_ACCESS_DRW;
-                      // else set TAR
-                      else
-                        state <= STATE_SET_TAR;
-                   end
-                 else
-                   ADIv5_WREN <= 0;
-                      
-               // Set TAR address
-               STATE_SET_TAR:
-                 if (!ADIv5_WRFULL)
-                   begin
-                      tar <= ahb_addr;
-                      ADIv5_WRDATA <= AP_REG_WRITE (AP_ADDR_TAR, tar);
-                      ADIv5_WREN <= 1;
-                      resp_pending <= resp_pending + 1;
-                      state <= STATE_ACCESS_DRW;
-                   end
-                 else
-                   ADIv5_WREN <= 0;
-               
-               // Return response to AHB master
-               STATE_AHB_RESP:
-                 begin
-                    // Done issuing commands
-                    ADIv5_WREN <= 0;
-
-                    // Wait until all responses received
-                    if (cmd_complete)
-                      begin
-                                        
-                         // Clear pending/received
-                         resp_pending <= 0;
-                         resp_recvd <= 0;
-
-                         // Latch read data onto AHB3 bus
-                         if (!ahb_wnr)
-                           slv_HRDATA <= resp.data;
-                        
-                         // Set response as OKAY/ERROR
-                         if (STAT != STAT_OK)
-                           begin
-                              // Signal error
-                              slv_HRESP <= HRESP_ERROR;
-
-                              // Go to wait state for one cycle
-                              state <= STATE_AHB_ERROR_WAIT;
-                           end
-                         else
-                           begin
-                              slv_HRESP <= HRESP_OKAY;
-
-                              // De-assert HREADYOUT
-                              slv_HREADYOUT <= 1;
-                         
-                              // Put back in IDLE state
-                              state <= STATE_IDLE;
-                           end
-                      end
-                 end // case: STATE_AHB_RESP
-               
-               // HRESP must be asserted for two cycles during an error
-               STATE_AHB_ERROR_WAIT:
-                 begin
-                    slv_HREADYOUT <= 1;
-                    state <= STATE_IDLE;
-                 end
-
-               // Should never get here
-               default:
-                 state <= STATE_DISABLED;
-               
-             endcase // case (state)
-
-             // Handle AHB slave requests
-             if (HSEL &
-                 HREADY &&
-                 (HTRANS != HTRANS_BUSY) &&
-                 (HTRANS != HTRANS_IDLE))
-               begin
-
-                  // Set HREADYOUT as busy
-                  slv_HREADYOUT <= 0;
-
-                  // Latch addr
-                  ahb_addr <= HADDR;
-                                    
-                  // Save read write state
-                  ahb_wnr <= HWRITE;
-
-                  // Save transaction size
-                  ahb_req_sz <= {1'b0, HSIZE[1:0]};
-                       
-                  // If write latch data next cycle
-                  if (HWRITE)
-                    ahb_latch_data <= 1;
-
-                  // Process next IDLE cycle
-                  ahb_pending <= 1;
-                  
-               end // if (HSEL &...
-          end // else: !if(!RESETn)        
+        // Handle AHB slave requests
+        if (HSEL &
+            HREADY &&
+            (HTRANS != HTRANS_BUSY) &&
+            (HTRANS != HTRANS_IDLE))
+          begin
+             
+             // Set HREADYOUT as busy
+             slv_HREADYOUT <= 0;
+             
+             // Latch addr
+             ahb_addr <= HADDR;
+             
+             // Save read write state
+             ahb_wnr <= HWRITE;
+             
+             // Save transaction size
+             ahb_req_sz <= {1'b0, HSIZE[1:0]};
+             
+             // If write latch data next cycle
+             if (HWRITE)
+               ahb_latch_data <= 1;
+             
+             // Process next IDLE cycle
+             ahb_pending <= 1;
+             
+          end // if (HSEL &...
      end // always @ (posedge CLK)
 
 endmodule // ahb3lite_remote_bridge
