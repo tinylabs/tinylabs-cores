@@ -18,6 +18,13 @@ module ahb3lite_debug_bridge
     // Route to default slave when not enabled
     input                              ENABLE,
 
+    // Runtime control of sequential vs keyhole access.
+    // Sequential access enables auto-increment for faster
+    // access time but doesn't preclude the use of BDn.
+    // Keyhole access disables auto-increment to allow
+    // continuous access of 4 word bank using BDn.
+    input                              SEQ,
+    
     // Side channel stat if failure
     output logic [2:0]                 STAT,
 
@@ -83,7 +90,8 @@ module ahb3lite_debug_bridge
                              STATE_SET_CSW,         // 9:
                              STATE_SET_TAR,         // 10:
                              STATE_AHB_RESP,        // 11:
-                             STATE_AHB_ERROR_WAIT   // 12:
+                             STATE_AHB_ERROR_WAIT,  // 12:
+                             STATE_UPDATE_APCSW     // 13: Update for SEQ input
                              } brg_state_t;
    brg_state_t state;
  
@@ -99,8 +107,11 @@ module ahb3lite_debug_bridge
    // Track commands pending/received
    logic [2:0]         resp_pending;
    logic [2:0]         resp_recvd;
+
+   // General housekeeping
    logic               cmd_complete;
    logic               check_resp;
+   logic               init_complete;
    
    // Save response from last cmd
    adiv5_resp_t resp;
@@ -182,17 +193,24 @@ module ahb3lite_debug_bridge
                     slv_HREADYOUT <= 1;
                     STAT <= STAT_OK;
                     ADIv5_WREN <= 0;
+                    init_complete <= 0;
                  end
             end
           
           STATE_IDLE:
             begin
-               
+               // Clear WREN after UPDATE_APCSW
+               ADIv5_WREN <= 0;
+
                // No current error
                slv_HRESP <= HRESP_OKAY;
-               
+
+               // If autoincrement changed then update csw
+               if (SEQ != csw.autoinc[0])
+                 state <= STATE_WRITE_DPSELECT;
+
                // Complete AHB transaction
-               if (ahb_pending)
+               else if (ahb_pending)
                  begin
                     
                     // Clear pending
@@ -221,7 +239,7 @@ module ahb3lite_debug_bridge
                            state <= STATE_SELECT_APBANK_0;
                       end
                     // BDn not consistent with autoinc or non-word width
-                    else if ((ahb_req_sz != CSW_WIDTH_WORD) || (csw.autoinc == CSW_INC_SINGLE) || (ahb_addr[31:2] != tar[31:2]))
+                    else if ((ahb_req_sz != CSW_WIDTH_WORD) || (ahb_addr[31:2] != tar[31:2]))
                       begin
                          // Check if bank matches TAR/CSW bank
                          if (bank_match (sel, AP_ADDR_TAR))
@@ -250,6 +268,20 @@ module ahb3lite_debug_bridge
                  end
             end // case: STATE_IDLE
           
+          // Update APCSW to reflect SEQ change
+          STATE_UPDATE_APCSW:
+            if (!ADIv5_WRFULL)
+              begin
+                 // Update CSW
+                 csw.autoinc <= csw_f_inc'({1'b0, SEQ});
+                 ADIv5_WRDATA <= AP_REG_WRITE (AP_ADDR_CSW, {csw[31:6], 1'b0, SEQ, csw[3:0]});
+                 ADIv5_WREN <= 1;
+                 resp_pending <= resp_pending + 1;
+                 state <= STATE_IDLE;
+              end
+            else
+              ADIv5_WREN <= 0;
+          
           // Write DP Select
           STATE_WRITE_DPSELECT:
             if (!ADIv5_WRFULL)
@@ -266,7 +298,12 @@ module ahb3lite_debug_bridge
                  ADIv5_WRDATA <= DP_REG_WRITE (DP_ADDR_SELECT, {APSEL, sel[23:8], 8'h0});
                  ADIv5_WREN <= 1;
                  resp_pending <= resp_pending + 1;
-                 state <= STATE_CACHE_APCSW;
+                 // Decide whether we are initializing or updating
+                 // autoincrement
+                 if (init_complete)
+                   state <= STATE_UPDATE_APCSW;
+                 else
+                   state <= STATE_CACHE_APCSW;
               end
             else
               ADIv5_WREN <= 0;
@@ -294,6 +331,8 @@ module ahb3lite_debug_bridge
                     csw <= resp.data;
                     // Put into IDLE
                     state <= STATE_IDLE;
+                    // Init is now complete
+                    init_complete <= 1;
                  end
             end
           
