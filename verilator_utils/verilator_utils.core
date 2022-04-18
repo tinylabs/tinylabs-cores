@@ -13,6 +13,10 @@ filesets:
             - JTAGServer.h : {is_include_file : true}
             - UARTServer.cpp
             - UARTServer.h : {is_include_file : true}
+            - GPIOServer.cpp
+            - GPIOServer.h : {is_include_file : true}
+            - GPIOClient.cpp
+            - GPIOClient.h : {is_include_file : true}
             - JTAGClient.cpp
             - JTAGClient.h : {is_include_file : true}
             - Server.cpp

@@ -13,6 +13,7 @@ VerilatorUtils::VerilatorUtils(uint32_t *mem)
     vcdFileName((char *)VCD_DEFAULT_NAME),
     jtagServerEnable(false), jtagServerPort(2345),
     uartServerEnable(false), uartServerPort(7777),
+    gpioServerEnable(false), gpioServerPort(8888),
     jtagClientEnable(false), jtagClientPort(2345) {
   tfp = new VerilatedVcdC;
   jtag_server = new JTAGServer (8);
@@ -29,6 +30,8 @@ VerilatorUtils::~VerilatorUtils() {
     delete jtag_server;
     delete uart_server;
     delete jtag_client;
+    delete gpio_client;
+    delete gpio_server;
 }
 
 bool VerilatorUtils::doJTAGServer (uint8_t *tck, uint8_t tdo, uint8_t *tdi, uint8_t *tms, uint8_t *srst) {
@@ -51,6 +54,20 @@ bool VerilatorUtils::doJTAGClient (uint8_t tck, uint8_t *tdo, uint8_t tdi, uint8
 {
   if (jtagClientEnable)
     jtag_client->doJTAGClient (t, tck, tdo, tdi, tms, tmsoe);
+  return true;
+}
+
+bool VerilatorUtils::doGPIOServer (uint64_t *input, size_t input_cnt, uint64_t output, size_t output_cnt)
+{
+  if (gpioServerEnable)
+    gpio_server->doGPIOServer (t, input, input_cnt, output, output_cnt);
+  return true;
+}
+
+bool VerilatorUtils::doGPIOClient (uint64_t *input, size_t input_cnt, uint64_t output, size_t output_cnt)
+{
+  if (gpioClientEnable)
+    gpio_client->doGPIOClient (t, input, input_cnt, output, output_cnt);
   return true;
 }
 
@@ -149,7 +166,9 @@ static struct argp_option options[] = {
   { 0, 0, 0, 0, "Remote debugging:", 3 },
   { "jtag-server", 'j', "PORT", OPTION_ARG_OPTIONAL, "Enable openocd JTAG server, opt. specify PORT" },
   { "uart-server", 'u', "PORT", OPTION_ARG_OPTIONAL, "Enable uart host server, opt. specify PORT" },
+  { "gpio-server", 'g', "PORT", OPTION_ARG_OPTIONAL, "Enable GPIO server opt. specify PORT" },
   { "jtag-client", 'r', "PORT", OPTION_ARG_OPTIONAL, "Connect to remote JTAG server opt. specify PORT" },
+  { "gpio-client", 'x', "PORT", OPTION_ARG_OPTIONAL, "Connect to remote GPIO server opt. specify PORT" },
   { 0 },
 };
 
@@ -205,6 +224,20 @@ int VerilatorUtils::parseOpts(int key, char *arg, struct argp_state *state) {
     if (arg)
       utils->jtagClientPort = atoi (arg);
     utils->jtag_client->Start (utils->jtagClientPort);
+    break;
+    
+  case 'g':
+    utils->gpioServerEnable = true;
+    if (arg)
+      utils->gpioServerPort = atoi (arg);
+    utils->gpio_server->Start (utils->gpioServerPort);
+    break;
+    
+  case 'x':
+    utils->gpioClientEnable = true;
+    if (arg)
+      utils->gpioClientPort = atoi (arg);
+    utils->gpio_client->Start (utils->gpioClientPort);
     break;
     
   default:

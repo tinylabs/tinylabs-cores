@@ -7,6 +7,8 @@
 #include "JTAGServer.h"
 #include "UARTServer.h"
 #include "JTAGClient.h"
+#include "GPIOServer.h"
+#include "GPIOClient.h"
 
 extern struct argp verilator_utils_argp;
 
@@ -20,8 +22,12 @@ public:
   JTAGServer *jtag_server;
   UARTServer *uart_server;
   JTAGClient *jtag_client;
+  GPIOClient *gpio_client;
+  GPIOServer *gpio_server;
   
   bool doCycle();
+  bool doGPIOServer (uint64_t *input, size_t input_cnt, uint64_t output, size_t output_cnt);
+  bool doGPIOClient (uint64_t *input, size_t input_cnt, uint64_t output, size_t output_cnt);
   bool doJTAGServer (uint8_t *tck, uint8_t tdo, uint8_t *tdi, uint8_t *tms, uint8_t *srst=NULL);
   bool doUARTServer (uint8_t tx, uint8_t *rx);
   bool doJTAGClient (uint8_t tck, uint8_t *tdo, uint8_t tdi, uint8_t *tms, uint8_t tmsoe = true);
@@ -52,7 +58,11 @@ private:
   int uartServerPort;
   bool jtagClientEnable;
   int jtagClientPort;
-
+  bool gpioServerEnable;
+  int gpioServerPort;
+  bool gpioClientEnable;
+  int gpioClientPort;
+  
   uint32_t *mem;
 
   bool loadElf(char *fileName);
