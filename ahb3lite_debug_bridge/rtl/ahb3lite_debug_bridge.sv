@@ -31,6 +31,11 @@ module ahb3lite_debug_bridge
     // Select AP - Required as DPv1+ does
     // not allow reading of DP-SELECT
     input [7:0]                        APSEL,
+
+    // Scan for IRQs when IDLE
+    // This requires target setups and
+    // cooperation from the host
+    input                              IRQSCAN,
     
     // Transparent AHB slave bridge
     input                              HREADY,
@@ -52,7 +57,12 @@ module ahb3lite_debug_bridge
     input                              ADIv5_WRFULL,
     input [ADIv5_RESP_WIDTH-1:0]       ADIv5_RDDATA,
     output logic                       ADIv5_RDEN,
-    input                              ADIv5_RDEMPTY
+    input                              ADIv5_RDEMPTY,
+
+    // FIFO output for IRQ scanning
+    output logic [7:0]                 IRQ_WRDATA,
+    output logic                       IRQ_WREN,
+    input                              IRQ_WRFULL
    );
 
    // Default slave when bridge is disabled, mux outputs
