@@ -28,10 +28,10 @@ class Server {
 
  protected:
   bool running;
-  uint32_t period;
   mc::ReaderWriterQueue<uint8_t> rx, tx;
 
  public:
+  uint32_t period;
   Server (const char *name, uint32_t period, bool debug=0);
   virtual ~Server ();
   void Start (uint16_t port);

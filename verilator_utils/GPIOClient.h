@@ -16,7 +16,8 @@ class GPIOClient {
   void SendOutputs (uint64_t output, size_t output_cnt);
   
  public:
-  GPIOClient (int dummy) {}
+  uint32_t period;
+  GPIOClient (int period) { this->period = period; }
   virtual ~GPIOClient () { if (gpiosock != -1) Stop (); }
 
   // Access functions

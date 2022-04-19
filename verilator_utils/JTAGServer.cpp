@@ -16,10 +16,6 @@ int JTAGServer::doJTAGServer (uint64_t t, uint8_t *tck, uint8_t tdo,
 {
   uint8_t cmd;
 
-  // Only pass signals every period cycles
-  if ((t % period) != 0)
-    return true;
-  
   // Pull a command off the receive queue
   if (tx.size_approx() && tx.try_dequeue (cmd)) {
     switch (cmd) {

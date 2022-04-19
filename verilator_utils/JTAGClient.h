@@ -14,7 +14,8 @@ class JTAGClient {
   int jtagsock = -1;
   
  public:
-  JTAGClient (int dummy) {}
+  uint32_t period;
+  JTAGClient (int period) {this->period = period; }
   virtual ~JTAGClient () { if (jtagsock != -1) Stop (); }
 
   // Access functions

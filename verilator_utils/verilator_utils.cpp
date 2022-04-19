@@ -12,13 +12,21 @@ VerilatorUtils::VerilatorUtils(uint32_t *mem)
   : mem(mem), t(0), timeout(0), vcdDump(false), vcdDumpStart(0), vcdDumpStop(0),
     vcdFileName((char *)VCD_DEFAULT_NAME),
     jtagServerEnable(false), jtagServerPort(2345),
+    jtagClientEnable(false), jtagClientPort(2345),
     uartServerEnable(false), uartServerPort(7777),
     gpioServerEnable(false), gpioServerPort(8888),
-    jtagClientEnable(false), jtagClientPort(2345) {
+    gpioClientEnable(false), gpioClientPort(8888)
+{
   tfp = new VerilatedVcdC;
-  jtag_server = new JTAGServer (8);
-  uart_server = new UARTServer (4); // period=oversample rate
-  jtag_client = new JTAGClient (0);
+
+  // Instantiate services
+  jtag_server = new JTAGServer (4);
+  uart_server = new UARTServer (4);
+  jtag_client = new JTAGClient (1);
+  gpio_server = new GPIOServer (2);
+  gpio_client = new GPIOClient (2);
+
+  // Enable tracing by default
   Verilated::traceEverOn(true);
   printf("Tracing on\n");
 }
@@ -38,35 +46,35 @@ bool VerilatorUtils::doJTAGServer (uint8_t *tck, uint8_t tdo, uint8_t *tdi, uint
   uint8_t dummy;
   if (!srst)
     srst = &dummy; 
-  if (jtagServerEnable)
+  if (jtagServerEnable && ((t % jtag_server->period) == 0))
     jtag_server->doJTAGServer (t, tck, tdo, tdi, tms, srst);
   return true;
 }
 
 bool VerilatorUtils::doUARTServer (uint8_t tx, uint8_t *rx)
 {
-  if (uartServerEnable)
+  if (uartServerEnable) // UART handles period calculations internally
     uart_server->doUARTServer (t, tx, rx);
   return true;
 }
 
 bool VerilatorUtils::doJTAGClient (uint8_t tck, uint8_t *tdo, uint8_t tdi, uint8_t *tms, uint8_t tmsoe)
 {
-  if (jtagClientEnable)
+  if (jtagClientEnable && ((t % jtag_client->period) == 0))
     jtag_client->doJTAGClient (t, tck, tdo, tdi, tms, tmsoe);
   return true;
 }
 
 bool VerilatorUtils::doGPIOServer (uint64_t *input, size_t input_cnt, uint64_t output, size_t output_cnt)
 {
-  if (gpioServerEnable)
+  if (gpioServerEnable && ((t % gpio_server->period) == 0))
     gpio_server->doGPIOServer (t, input, input_cnt, output, output_cnt);
   return true;
 }
 
 bool VerilatorUtils::doGPIOClient (uint64_t *input, size_t input_cnt, uint64_t output, size_t output_cnt)
 {
-  if (gpioClientEnable)
+  if (gpioClientEnable && ((t % gpio_client->period) == 0))
     gpio_client->doGPIOClient (t, input, input_cnt, output, output_cnt);
   return true;
 }
