@@ -27,7 +27,10 @@ module cm3_min_soc
      // 8-bit GPIO port
      output logic [7:0] GPIO_O,
      output logic [7:0] GPIO_OE,
-     input        [7:0] GPIO_I
+     input        [7:0] GPIO_I,
+
+     // 16 IRQs
+     input [15:0] IRQ
    );
 
    // Implicit reset for autogen interconnect
@@ -52,11 +55,6 @@ module cm3_min_soc
    logic [APB4_PDATA_SIZE-1:0]     apb4_PWDATA;
    logic [APB4_PDATA_SIZE-1:0]     apb4_PRDATA;   
    
-   // IRQs to cm3 core
-   logic [15:0] irq;
-   
-   // GPIO IRQ on 0 (IRQ16)
-   logic                       gpio_irq;
    logic [APB4_PDATA_SIZE-1:0] gpio_i;
    logic [APB4_PDATA_SIZE-1:0] gpio_o;
    logic [APB4_PDATA_SIZE-1:0] gpio_oe;
@@ -64,8 +62,6 @@ module cm3_min_soc
    assign GPIO_O = gpio_o[7:0];
    assign GPIO_OE = gpio_oe[7:0];
    
-   assign irq = {15'h0, gpio_irq};
-
    // CPU reset controller
    logic        cpureset_n, sysresetreq;
    logic [3:0]  cpureset_ctr;
@@ -186,7 +182,7 @@ module cm3_min_soc
                  .PREADY    (apb4_PREADY),
                  .PSLVERR   (apb4_PSLVERR),
                  // GPIO/IRQ out
-                 .irq_o     (gpio_irq),
+                 .irq_o     (),
                  .gpio_i    (gpio_i),
                  .gpio_o    (gpio_o),
                  .gpio_oe   (gpio_oe)
@@ -228,7 +224,7 @@ module cm3_min_soc
             .SYSRESETREQ  (sysresetreq),
             
             // IRQs
-            .INTISR       (irq),
+            .INTISR       (IRQ),
             .INTNMI       (1'b0),
             
             // Debug

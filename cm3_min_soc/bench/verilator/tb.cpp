@@ -68,7 +68,7 @@ int main(int argc, char **argv, char **env)
 {
 	uint32_t insn = 0;
 	uint32_t ex_pc = 0;
-
+    
 	Verilated::commandArgs(argc, argv);
 
 	Vcm3_min_soc* top = new Vcm3_min_soc;
@@ -81,7 +81,8 @@ int main(int argc, char **argv, char **env)
     top->CLK = 0;
     top->PORESETn = 0;
 	top->trace(utils->tfp, 99);
-
+    top->IRQ = 0;
+    
 	while (utils->doCycle() && !done) {
 		if (utils->getTime() > RESET_TIME)
 			top->PORESETn = 1;
@@ -89,12 +90,8 @@ int main(int argc, char **argv, char **env)
 		top->eval();
         top->CLK = !top->CLK;
         utils->doJTAGServer (&top->TCK, top->TDO, &top->TDI, top->TMSOE ? &top->TMSOUT : &top->TMSIN, &top->PORESETn);
-
-        // Trigger interrupt
-        if ((utils->getTime() >= 800) && (utils->getTime() < 810))
-          top->GPIO_I = 1;
-        else
-          top->GPIO_I = 0;
+        utils->doGPIOServer ((uint64_t *)&top->IRQ, 16, 0, 0);
+        
 	}
 
 	delete utils;
