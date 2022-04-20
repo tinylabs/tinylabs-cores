@@ -113,7 +113,8 @@ bool VerilatorUtils::doCycle() {
 
 bool VerilatorUtils::loadElf(char *fileName) {
   int size;
-
+  uint8_t *bin_data;
+ 
   printf("Loading %s\n", fileName);
   bin_data = load_elf_file(fileName, &size);
   if (bin_data == NULL) {
@@ -166,9 +167,11 @@ static struct argp_option options[] = {
   { "vcdstop", 't', "VAL", 0, "Terminate VCD generation at VAL" },
   { 0, 0, 0, 0, "Remote debugging:", 3 },
   { "jtag-server", 'j', "PORT", OPTION_ARG_OPTIONAL, "Enable openocd JTAG server, opt. specify PORT" },
-  { "uart-server", 'u', "PORT", OPTION_ARG_OPTIONAL, "Enable uart host server, opt. specify PORT" },
-  { "gpio-server", 'g', "PORT", OPTION_ARG_OPTIONAL, "Enable GPIO server opt. specify PORT" },
   { "jtag-client", 'r', "PORT", OPTION_ARG_OPTIONAL, "Connect to remote JTAG server opt. specify PORT" },
+  { 0, 0, 0, 0, "Remote host communication:", 4 },  
+  { "uart-server", 'u', "PORT", OPTION_ARG_OPTIONAL, "Enable uart host server, opt. specify PORT" },
+  { 0, 0, 0, 0, "Remote GPIO link:", 5 },  
+  { "gpio-server", 'g', "PORT", OPTION_ARG_OPTIONAL, "Enable GPIO server opt. specify PORT" },
   { "gpio-client", 'x', "PORT", OPTION_ARG_OPTIONAL, "Connect to remote GPIO server opt. specify PORT" },
   { 0 },
 };
