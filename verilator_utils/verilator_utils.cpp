@@ -112,7 +112,6 @@ bool VerilatorUtils::doCycle() {
 }
 
 bool VerilatorUtils::loadElf(char *fileName) {
-  uint8_t *bin_data;
   int size;
 
   printf("Loading %s\n", fileName);
@@ -126,7 +125,6 @@ bool VerilatorUtils::loadElf(char *fileName) {
     this->mem[i/4] = read_32(bin_data, i);
 
   free(bin_data);
-
   return true;
 }
 
@@ -144,17 +142,12 @@ bool VerilatorUtils::loadBin(char *fileName) {
   fseek(bin_file, 0, SEEK_END);
   size = ftell(bin_file);
   rewind(bin_file);
-  bin_data = (uint8_t *)malloc(size);
-  if (fread(bin_data, 1, size, bin_file) != size) {
+  if (fread(this->mem, 1, size, bin_file) != size) {
     printf("Error reading bin file\n");
     return false;
   }
 
-  for (int i=0; i < size; i+=4)
-    this->mem[i/4] = read_32(bin_data, i);
-
-  free(bin_data);
-
+  fclose (bin_file);
   return true;
 }
 
