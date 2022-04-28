@@ -1,22 +1,33 @@
 /**
- * Transparent bridge between AHB3 slave and ADIv5 ARM debug interface
+ * Transparent bridge between AHB3 slave and ADIv5 ARM debug interface.
  * 
  *  IRQ scanning
  *    This consists of a target setup component (handled by software)
  *    and a hardware scanning component (implemented here). The setup
  *    must include the following:
- *    - Target runs minimal environment to push IRQs to 3 IRQ buffer
- *      at DCRDR. The format is the following:
- *    - CC XX YY ZZ where CC is the 8lsb of a 32bit counter
- *      and ZZ is the most recent IRQ.
- *    - IRQ is disabled after pushing to host.
- *    - Host reenables IRQ after servicing.
+ *    1. Setup a full INTVEC table and update VTOR if necessary.
+ *    2. Setup single ISR to handle all interrupts.
+ *    3. ISR shall consist of the following two instructions:
+ *       bkpt
+ *       reti
+ *    4. Configure the stack register MSR to point to enough
+ *       valid memory to handle nested interrupts.
+ *    5. Set PC to point to infinite loop.
+ *    6. Set DCRSR to 0x00000010 (Read xPSR)
+ *    7. Take CPU out of HALT
+ *    8. After the above is complete you can set the SCAN_IRQ bit.
  * 
  *  Hardware scanning consists of the following when there are 
  *  spare cycles (No AHB3 request to service):
- *    - Continuously scan DCRDR for changes.
- *    - Calculate new IRQ count from 8lsb counter.
- *    - Push new IRQs to FIFO to forward to host.
+ *    1. Setup DPSELECT to APBANK0 if not configured.
+ *    2. Set TAR to DHCSR (0xE000EDF0)
+ *    3. Continuously scan DHCSR bit 17 S_HALT via BD0
+ *    4. If HALT detected:
+ *       - Write 0x00000010 (read xPSR) to DCRSR (0xE000EDF4)
+ *       - Poll DHCSR (0xE000EDF0) bit 16 S_REGRDY.
+ *       - Read xPSR from DCRDR (0xE000EDF8).
+ *       - Push lowest 8bits of xPSR to IRQ FIFO
+ *       - Remove CPU from HALT.
  *    
  *  All rights reserved.
  *  Tiny Labs Inc
@@ -36,7 +47,7 @@ module ahb3lite_debug_bridge
     input                              ENABLE,
 
     // Runtime control of sequential vs keyhole access.
-    // Sequential access enables auto-increment for faster
+    // Sequential access enabled auto-increment for faster
     // access time but doesn't preclude the use of BDn.
     // Keyhole access disables auto-increment to allow
     // continuous access of 4 word bank using BDn.
@@ -49,10 +60,10 @@ module ahb3lite_debug_bridge
     // not allow reading of DP-SELECT
     input [7:0]                        APSEL,
 
-    // Scan for IRQs when IDLE
-    // This requires target setups and
-    // cooperation from the host
-    input                              IRQSCAN,
+    // Scan IRQs
+    // This requires SW setup of target
+    // See above for details
+    input                              SCAN_IRQ,
     
     // Transparent AHB slave bridge
     input                              HREADY,
@@ -74,12 +85,7 @@ module ahb3lite_debug_bridge
     input                              ADIv5_WRFULL,
     input [ADIv5_RESP_WIDTH-1:0]       ADIv5_RDDATA,
     output logic                       ADIv5_RDEN,
-    input                              ADIv5_RDEMPTY,
-
-    // FIFO output for IRQ scanning
-    output logic [7:0]                 IRQ_WRDATA,
-    output logic                       IRQ_WREN,
-    input                              IRQ_WRFULL
+    input                              ADIv5_RDEMPTY
    );
 
    // Default slave when bridge is disabled, mux outputs
@@ -104,29 +110,21 @@ module ahb3lite_debug_bridge
                       );
    
    // State machine
-   parameter STATE_WIDTH = 5;
-   typedef enum logic [STATE_WIDTH-1:0] {
-                             STATE_DISABLED,              // 0: Interface disabled
-                             STATE_IDLE,                  // 1: Waiting for command
-                             STATE_WRITE_DPSELECT,        // 2: during enable.
-                             STATE_CACHE_APCSW,           // 3:
-                             STATE_READ_APCSW,            // 4:
-                             STATE_ACCESS_DRW,            // 5: Read/Write DRW
-                             STATE_ACCESS_BDn,            // 6: Read/Write BD[0-3]
-                             STATE_SELECT_APBANK_0,       // 7:
-                             STATE_SELECT_APBANK_1,       // 8:
-                             STATE_SET_CSW,               // 9:
-                             STATE_SET_TAR,               // 10:
-                             STATE_AHB_RESP,              // 11:
-                             STATE_AHB_ERROR_WAIT,        // 12:
-                             STATE_UPDATE_APCSW,          // 13: Update for SEQ input
-                             STATE_IRQSCAN,               // 14:
-                             STATE_IRQSCAN_ERROR,         // 15:
-                             STATE_COREREG_WRITE,         // 16:
-                             STATE_COREREG_ACCESS,        // 17:
-                             STATE_COREREG_POLL_DHCSR,    // 18:
-                             STATE_COREREG_READ_DCRDR,    // 19:
-                             STATE_COREREG_DCRDR_LATCH    // 20:
+   typedef enum logic [3:0] {
+                             STATE_DISABLED,        // 0: Interface disabled
+                             STATE_IDLE,            // 1: Waiting for command
+                             STATE_WRITE_DPSELECT,  // 2: during enable.
+                             STATE_CACHE_APCSW,     // 3:
+                             STATE_READ_APCSW,      // 4:
+                             STATE_ACCESS_DRW,      // 5: Read/Write DRW
+                             STATE_ACCESS_BDn,      // 6: Read/Write BD[0-3]
+                             STATE_SELECT_APBANK_0, // 7:
+                             STATE_SELECT_APBANK_1, // 8:
+                             STATE_SET_CSW,         // 9:
+                             STATE_SET_TAR,         // 10:
+                             STATE_AHB_RESP,        // 11:
+                             STATE_AHB_ERROR_WAIT,  // 12:
+                             STATE_UPDATE_APCSW     // 13: Update for SEQ input
                              } brg_state_t;
    brg_state_t state;
  
@@ -140,112 +138,35 @@ module ahb3lite_debug_bridge
    logic [2:0]         ahb_req_sz;     // Requested size
 
    // Track commands pending/received
-   parameter CTR_WIDTH = 3;
-   logic [CTR_WIDTH-1:0] resp_pending;
-   logic [CTR_WIDTH-1:0] resp_recvd;
+   logic [2:0]         resp_pending;
+   logic [2:0]         resp_recvd;
 
    // General housekeeping
-   logic                 cmd_complete;
-   logic                 check_resp;
-   logic                 init_complete;
-
-   // Core register access API
-   parameter CORE_REG_xPSR = 5'b10000;
-   parameter CORE_REG_PC   = 5'b01111;
-
-   typedef struct packed {
-      logic [31:0]            data;
-      logic [4:0]             sel;
-      logic                   wnr;
-      logic [STATE_WIDTH-1:0] next;
-   } core_reg_t;
-
-   // Global struct for core reg access
-   core_reg_t core_reg;
-   
-   function core_reg_t CORE_REG_READ(logic [4:0] sel, logic [STATE_WIDTH-1:0] next);
-      CORE_REG_READ.sel = sel;
-      CORE_REG_READ.wnr = 0;
-      CORE_REG_READ.next = next;
-   endfunction // CORE_REG_READ
-
-   function core_reg_t CORE_REG_WRITE(logic [4:0] sel, logic [31:0] data, logic [STATE_WIDTH-1:0] next);
-      CORE_REG_WRITE.sel = sel;
-      CORE_REG_WRITE.data = data;
-      CORE_REG_WRITE.wnr = 1;
-      CORE_REG_WRITE.next = next;
-   endfunction // CORE_REG_WRITE
+   logic               cmd_complete;
+   logic               check_resp;
+   logic               init_complete;
+   logic               irq_scan_active;
    
    // Save response from last cmd
    adiv5_resp_t resp;
    
-   // DP/AP registers
+   // Registers
    adiv5_ap_csw        csw;
    adiv5_dp_sel        sel;
    logic [31:0]        tar;
 
-   // IRQ scan accounting
-   logic               irq_scan_active;
-   logic               irq_scan_error;
-   logic               irq_processing;
-   logic               irq_fifo_check_resp;
-   logic               irq_cmd;
-   logic [31:0]        irq_ctr;
-   logic [31:0]        irq_prev;
-   logic [7:0]         irq_new_cnt;
-   
-   // IRQ fifo interface
-   logic [31:0]        irq_fifo_wrdata, irq_fifo_rddata;
-   logic               irq_fifo_wren, irq_fifo_rden;
-   logic               irq_fifo_wrfull, irq_fifo_rdempty;
-   
-   // Instantiate an internal fifo for processing IRQs
-   fifo #(
-          .DEPTH_WIDTH  (3), // 8 slots in fifo
-          .DATA_WIDTH   (32)
-          ) u_irq_fifo
-     (
-      .clk        (CLK),
-      .rst        (~RESETn),
-      .wr_data_i  (irq_fifo_wrdata),
-      .wr_en_i    (irq_fifo_wren),
-      .rd_data_o  (irq_fifo_rddata),
-      .rd_en_i    (irq_fifo_rden),
-      .full_o     (irq_fifo_wrfull),
-      .empty_o    (irq_fifo_rdempty)
-      );   
-   
-   // Get max
-   parameter CTR_MAX = CTR_WIDTH'($rtoi($pow (2, CTR_WIDTH) - 1));
-   
-   // Calculate previous response
-   logic [CTR_WIDTH-1:0] resp_pending_next; //resp_pending_prev
-   //assign resp_pending_prev = (resp_pending == 0) ? CTR_MAX : resp_pending - 1;
-   assign resp_pending_next = (resp_pending == CTR_MAX) ? 0 : resp_pending + 1;
-   
-   // Synthesized inhibit signal
-   // Inhibit if buffer is full or wrapping around
-   logic               ADIv5_INHIBIT;
-   assign ADIv5_INHIBIT = ADIv5_WRFULL | (resp_pending_next == resp_recvd);
-   
    // Command is complete when we've received all responses
    assign cmd_complete = (resp_pending == resp_recvd);
  
    // Always read responses while available
    assign ADIv5_RDEN = !ADIv5_RDEMPTY;
-
-   // Alway process IRQ FIFO when data is available
-   assign irq_fifo_rden = !irq_fifo_rdempty & !irq_processing;
    
    // Remote AHB bridge
    always @(posedge CLK)
      begin
         if (!ENABLE | !RESETn)
-          begin
-             state <= STATE_DISABLED;
-             irq_ctr <= 0;
-          end
-        
+          state <= STATE_DISABLED;
+
         // Main processing
         else
           begin
@@ -264,82 +185,38 @@ module ahb3lite_debug_bridge
                   // Get response
                   resp <= ADIv5_RDDATA;
                   resp_recvd <= resp_recvd + 1;
-                  $display ("state=%d resp=%h", state, ADIv5_RDDATA[ADIv5_RESP_WIDTH-1:3]);
 
+                  // Interpret IRQ scanning results if active
+                  if (irq_scan_active)
+                    begin
+
+                       // If we've finished scanning and caught up
+                       // with responses then disable
+                       if (cmd_complete)
+                         irq_scan_active <= 0;
+                       else
+                         begin
+                            // Check bit 17 of response to see if halted
+                            if ((ADIv5_RDDATA[2:0] == STAT_OK) && ADIv5_RDDATA[20])
+                              begin
+                                 // Read xPSR to get IRQ
+                                 state <= SCAN_IRQ_READ_xPSR;
+
+                                 // Stop scan temporarily
+                                 irq_scan_active <= 0;
+                              end
+                         end
+                    end
                   // Set sticky STAT reg if failure
-                  if (ADIv5_RDDATA[2:0] != STAT_OK)
+                  else if (ADIv5_RDDATA[2:0] != STAT_OK)
                     begin
                        STAT <= ADIv5_RDDATA[2:0];
                        // Assume TAR is no longer valid if autoinc
                        // in case it was a failed write
                        tar <= -1;
-
-                       // If there's an active scan then push error to interface
-                       if (irq_scan_active)
-                         begin
-                            state <= STATE_IRQSCAN_ERROR;
-                            IRQ_WRDATA <= 8'h01; // Write cmd to FIFO
-                            IRQ_WREN <= 1;
-                         end
-                    end
-               end // if (check_resp)
-
-             // Decode IRQs from internal FIFO
-             if (irq_fifo_rden)
-               begin
-                  irq_fifo_check_resp <= 1;
-                  irq_processing <= 1;
-                  irq_cmd <= 0;
-               end
-             
-             // Decode IRQ fifo data
-             if (irq_fifo_check_resp)
-               begin
-                  // Calculate new IRQs
-                  irq_new_cnt <= irq_fifo_rddata[31:24] - irq_ctr[31:24];
-                  irq_fifo_check_resp <= 0;
-               end
-
-             // Latch each IRQ into external FIFO
-             if (irq_processing)
-               begin
-                  if (irq_cmd)
-                    begin
-                       case (irq_new_cnt)
-                         // Select correct byte
-                         8'd1: IRQ_WRDATA <= irq_fifo_rddata[7:0];
-                         8'd2: IRQ_WRDATA <= irq_fifo_rddata[15:8];
-                         8'd3: IRQ_WRDATA <= irq_fifo_rddata[23:16];
-                         // Error if any other value
-                         default:
-                           begin
-                              state <= STATE_IRQSCAN_ERROR;
-                              IRQ_WRDATA <= 8'h01;
-                              IRQ_WREN <= 1;
-                           end
-                       endcase // case (irq_new_cnt)
-
-                       // Decrement counter
-                       irq_new_cnt <= irq_new_cnt - 1;
-                       irq_cmd <= 0;
-                    end
-                  else
-                    begin
-                       // Check if we're done
-                       if (irq_new_cnt == 0)
-                         begin
-                            irq_processing <= 0;
-                            IRQ_WREN <= 0;
-                         end
-                       else
-                       begin
-                          // Write command header
-                          IRQ_WRDATA <= 8'h10;
-                          IRQ_WREN <= 1;
-                          irq_cmd <= 1;
-                       end
                     end
                end
+              
              // Latch ahb data next cycle
              if (ahb_latch_data)
                begin
@@ -373,9 +250,6 @@ module ahb3lite_debug_bridge
                     ADIv5_WREN <= 0;
                     init_complete <= 0;
                     irq_scan_active <= 0;
-                    irq_scan_error <= 0;
-                    irq_processing <= 0;
-                    irq_fifo_check_resp <= 0;
                  end
             end
           
@@ -421,7 +295,7 @@ module ahb3lite_debug_bridge
                            state <= STATE_SELECT_APBANK_0;
                       end
                     // BDn not consistent with autoinc or non-word width
-                    else if ((ahb_req_sz != CSW_WIDTH_WORD) || (ahb_addr[31:4] != tar[31:4]))
+                    else if ((ahb_req_sz != CSW_WIDTH_WORD) || (ahb_addr[31:2] != tar[31:2]))
                       begin
                          // Check if bank matches TAR/CSW bank
                          if (bank_match (sel, AP_ADDR_TAR))
@@ -448,7 +322,7 @@ module ahb3lite_debug_bridge
                            state <= STATE_SELECT_APBANK_1;
                       end
                  end // if (ahb_pending)
-               else if (IRQSCAN & !irq_scan_error)
+               else if (SCAN_IRQ)
                  begin
                       
                     // Here we co-opt the system to make
@@ -459,14 +333,9 @@ module ahb3lite_debug_bridge
                     ahb_addr <= 32'hE000EDF0;
                     // Read operation
                     ahb_wnr <= 0;
-
-                    // Are we already accessing bank?
-                    if (bank_match (sel, AP_ADDR_BD0) &&
-                        (tar[31:4] == 28'hE000EDF) &&
-                        (csw.width == CSW_WIDTH_WORD))
-                      state <= STATE_IRQSCAN;
+                    
                     // Check where to start in the sequence
-                    else if (bank_match (sel, AP_ADDR_TAR))
+                    if (bank_match (sel, AP_ADDR_TAR))
                       begin
                          if (csw.width != CSW_WIDTH_WORD)
                            state <= STATE_SET_CSW;
@@ -474,121 +343,71 @@ module ahb3lite_debug_bridge
                            state <= STATE_SET_TAR;
                       end
                     else
-                      state <= STATE_SELECT_APBANK_0;
+                      state <= STATE_SELECT_APBANK0;
                  end
             end // case: STATE_IDLE
 
-          STATE_IRQSCAN:
+          // Wait for IRQ scan setup to complete
+          STATE_IRQ_SCAN_WAIT:
+            begin
+               ADIv5_WREN <= 0;
+               if (cmd_complete)
+                 begin
+                    // Start scanning
+                    state <= STATE_IRQ_SCAN;
+                 end
+            end
+
+          // Scan for HALT until ahb request comes in
+          STATE_IRQ_SCAN:
             begin
                // Cancel if AHB request pending or scan deasserted
-               if (ahb_pending | !IRQSCAN)
+               if (ahb_pending | !SCAN_IRQ)
                  begin
-                    state <= STATE_IDLE;
+                    state <= IDLE;
                     ADIv5_WREN <= 0;
-                    irq_fifo_wren <= 0;
                  end
-               // Keep one command issued in queue
-               else if (!ADIv5_INHIBIT & cmd_complete)
+               else if (!ADIv5_WRFULL)
                  begin
                     // Set IRQ scan as active
                     irq_scan_active <= 1;
 
-                    // Write READ request to BD2 (DCRDR) continuously.
+                    // Write READ request to BD0 continuously.
                     // The results will be checked in parallel
-                    ADIv5_WRDATA <= AP_REG_READ (AP_ADDR_BD0);
+                    // for max throughput
+                    ADIv5_WRDATA <= AP_REG_READ (AP_ADDR_BD0 | {4'h0, ahb_addr[1:0]});
                     ADIv5_WREN <= 1;
                     resp_pending <= resp_pending + 1;
-
-                    // Initialize if first scan
-                    if (irq_ctr == 0)
-                      irq_prev <= resp.data;
-                    // Check previous results
-                    // If theres a change push into fifo
-                    else if (irq_prev != resp.data)
-                      begin
-                         // Error if FIFO fills up
-                         if (irq_fifo_wrfull & irq_fifo_wren)
-                           begin
-                              state <= STATE_IRQSCAN_ERROR;
-                              IRQ_WRDATA <= 8'h01;
-                              IRQ_WREN <= 1;
-                           end
-                         // Push data onto internal FIFO for parallel processing
-                         else
-                           begin
-                              irq_prev <= resp.data;
-                              irq_fifo_wrdata <= resp.data;
-                              irq_fifo_wren <= 1;
-                           end
-                      end
-                    else
-                      irq_fifo_wren <= 0;
                  end
                // Terminate write if FIFO full
                else
-                 begin
-                    irq_fifo_wren <= 0;
-                    ADIv5_WREN <= 0;
-                 end
+                 ADIv5_WREN <= 0;                 
             end
 
-          // IRQ scan error, exit scan and write error code
-          // to interface.
-          // TODO: Add sticky bit CSR to clear/inhibit
-          STATE_IRQSCAN_ERROR:
-            begin
-               // Update flags
-               irq_scan_active <= 0;
-               irq_scan_error <= 1;
-               state <= STATE_IDLE;
-               IRQ_WREN <= 0;
-            end
-
-          // Write data to core reg
-          STATE_COREREG_WRITE:
-            if (!ADIv5_INHIBIT)
+          // Write READ_xPSR CMD to DCRSR
+          STATE_SCAN_IRQ_READ_xPSR_CMD:
+            if (!ADIv5_WRFULL)
               begin
-                 ADIv5_WRDATA <= AP_REG_WRITE (AP_ADDR_BD2, core_reg.data);
+                 ADIv5_WRDATA <= AP_REG_WRITE (AP_ADDR_BD1, 0x00000010);
                  ADIv5_WREN <= 1;
                  resp_pending <= resp_pending + 1;
-
-                 // Poll for complete
-                 state <= STATE_COREREG_ACCESS;
-              end
-            else
-              ADIv5_WREN <= 0;            
-            
-          // Send read/write command
-          STATE_COREREG_ACCESS:
-            if (!ADIv5_INHIBIT)
-              begin
-                 ADIv5_WRDATA <= AP_REG_WRITE (AP_ADDR_BD1, {16'h0, core_reg.wnr, 10'h0, core_reg.sel});
-                 ADIv5_WREN <= 1;
-                 resp_pending <= resp_pending + 1;
-
-                 // Poll for complete
-                 state <= STATE_COREREG_POLL_DHCSR;
+                 // Wait for command to be ready
+                 state <= SCAN_IRQ_xPSR_READY;
               end
             else
               ADIv5_WREN <= 0;
           
-          // Wait for core reg access to complete
-          STATE_COREREG_POLL_DHCSR:
+          // Wait for READY bit
+          STATE_SCAN_IRQ_xPSR_READY:
             begin
-               // Check if command complete
-               if (cmd_complete & resp.data[16])
+               // If command complete and xPSR ready to read
+               if (cmd_complete && resp.data[16])
                  begin
-                    // Clear write enable
+                    state <= STATE_SCAN_IRQ_READ_xPSR;
                     ADIv5_WREN <= 0;
-
-                    // If this was a write we are done
-                    if (core_reg.wnr)
-                      state <= core_reg.next;
-                    else
-                      state <= STATE_COREREG_READ_DCRDR;
                  end
                // Issue another read
-               else if (!ADIv5_INHIBIT & cmd_complete)
+               else if (!ADIv5_WRFULL)
                  begin
                     ADIv5_WRDATA <= AP_REG_READ (AP_ADDR_BD0);
                     ADIv5_WREN <= 1;
@@ -596,26 +415,21 @@ module ahb3lite_debug_bridge
                  end
                else
                  ADIv5_WREN <= 0;
-            end 
+            end // case: SCAN_IRQ_xPSR_READY
 
-          // Read result
-          STATE_COREREG_READ_DCRDR:
-            begin
-               // Once READY polling is flushed, send read
-               if (!ADIv5_INHIBIT)
-                 begin
-                    // Read xPSR reg
-                    ADIv5_WRDATA <= AP_REG_READ (AP_ADDR_BD2);
-                    ADIv5_WREN <= 1;
-                    resp_pending <= resp_pending + 1;
-                    state <= STATE_COREREG_DCRDR_LATCH;
-                 end
-               else
-                 ADIv5_WREN <= 0;
-            end
-            
-          // Latch core register
-          STATE_COREREG_DCRDR_LATCH:
+          STATE_SCAN_IRQ_READ_xPSR:
+            if (!ADIv5_WRFULL)
+              begin
+                 ADIv5_WRDATA <= AP_REG_READ (AP_ADDR_BD2);
+                 ADIv5_WREN <= 1;
+                 resp_pending <= resp_pending + 1;
+                 state <= STATE_SCAN_IRQ_LATCH;
+              end
+            else
+              ADIv5_WREN <= 0;
+
+          // Latch IRQ into outgoing FIFO
+          STATE_SCAN_IRQ_LATCH:
             begin
                ADIv5_WREN <= 0;
 
@@ -623,20 +437,22 @@ module ahb3lite_debug_bridge
                if (cmd_complete)
                  begin
                     // Latch onto outgoing FIFO
-                    core_reg.data <= resp.data;
+                    IRQ_WRDATA <= resp.data[7:0];
+                    IRQ_WREN <= 1;
 
-                    // Return to state
-                    state <= core_reg.next;
+                    // Unhalt core
+                    state <= STATE_SCAN_IRQ_INC_PC;
                  end
-            end
-            
+            end // case: STATE_SCAN_IRQ_LATCH
+
+          // Increment PC and continue
+          
                
           // Update CSW to reflect autoincrement change
           STATE_UPDATE_APCSW:
-            if (!ADIv5_INHIBIT)
+            if (!ADIv5_WRFULL)
               begin
-                 // Update CSW
-                 csw.autoinc <= csw_f_inc'({1'b0, SEQ});
+                 csw.autoinc <= {1'b0, SEQ};
                  ADIv5_WRDATA <= AP_REG_WRITE (AP_ADDR_CSW, {csw[31:6], 1'b0, SEQ, csw[3:0]});
                  ADIv5_WREN <= 1;
                  resp_pending <= resp_pending + 1;
@@ -647,7 +463,7 @@ module ahb3lite_debug_bridge
 
           // Write DP Select
           STATE_WRITE_DPSELECT:
-            if (!ADIv5_INHIBIT)
+            if (!ADIv5_WRFULL)
               begin
                  // Note: We don't change APSEL. That's inherited
                  // from configuration before enabling bridge
@@ -673,7 +489,7 @@ module ahb3lite_debug_bridge
           
           // Cache AP_CSW
           STATE_CACHE_APCSW:
-            if (!ADIv5_INHIBIT)
+            if (!ADIv5_WRFULL)
               begin
                  // Send READ_AP command
                  ADIv5_WRDATA <= AP_REG_READ (AP_ADDR_CSW);
@@ -691,7 +507,7 @@ module ahb3lite_debug_bridge
                if (cmd_complete)
                  begin
                     // Save CSW
-                    csw <= {1'b1, resp.data[30:0]};
+                    csw <= resp.data;
                     // Put into IDLE
                     state <= STATE_IDLE;
                     // Init is now complete
@@ -701,7 +517,7 @@ module ahb3lite_debug_bridge
           
           // Access DRW directly
           STATE_ACCESS_DRW:
-            if (!ADIv5_INHIBIT)
+            if (!ADIv5_WRFULL)
               begin
                  // Directly access DRW
                  ADIv5_WREN <= 1;
@@ -722,7 +538,7 @@ module ahb3lite_debug_bridge
           
           // Access banked BDn register
           STATE_ACCESS_BDn:
-            if (!ADIv5_INHIBIT)
+            if (!ADIv5_WRFULL)
               begin
                  ADIv5_WREN <= 1;
                  resp_pending <= resp_pending + 1;
@@ -730,6 +546,7 @@ module ahb3lite_debug_bridge
                    ADIv5_WRDATA <= AP_REG_WRITE (AP_ADDR_BD0 | {4'h0, ahb_addr[1:0]}, ahb_data);
                  else
                    ADIv5_WRDATA <= AP_REG_READ (AP_ADDR_BD0 | {4'h0, ahb_addr[1:0]});
+
                  state <= STATE_AHB_RESP;
               end
             else
@@ -737,7 +554,7 @@ module ahb3lite_debug_bridge
           
           // Switch to apbank 0
           STATE_SELECT_APBANK_0:
-            if (!ADIv5_INHIBIT)
+            if (!ADIv5_WRFULL)
               begin
                  sel.apbank <= 0;
                  ADIv5_WRDATA <= DP_REG_WRITE (DP_ADDR_SELECT, {sel[31:8], 4'h0, 4'h0});
@@ -758,7 +575,7 @@ module ahb3lite_debug_bridge
           
           // Switch to apbank 1
           STATE_SELECT_APBANK_1:
-            if (!ADIv5_INHIBIT)
+            if (!ADIv5_WRFULL)
               begin
                  sel.apbank <= 1;
                  ADIv5_WRDATA <= DP_REG_WRITE (DP_ADDR_SELECT, {sel[31:8], 4'h1, 4'h0});
@@ -770,14 +587,14 @@ module ahb3lite_debug_bridge
                    state <= STATE_ACCESS_BDn;
                  // Otherwise move to IRQ scan
                  else
-                   state <= STATE_IRQSCAN;
+                   state <= STATE_IRQ_SCAN_WAIT;
               end
             else
               ADIv5_WREN <= 0;
                
           // Set CSW width
           STATE_SET_CSW:
-            if (!ADIv5_INHIBIT)
+            if (!ADIv5_WRFULL)
               begin
                  // Save new size
                  csw.width <= csw_f_width'(ahb_req_sz);
@@ -785,7 +602,7 @@ module ahb3lite_debug_bridge
                  ADIv5_WREN <= 1;
                  resp_pending <= resp_pending + 1;
                  // If TAR already matches
-                 if ((ahb_addr == tar) && !slv_HREADYOUT)
+                 if (ahb_addr == tar)
                    state <= STATE_ACCESS_DRW;
                  // else set TAR
                  else
@@ -796,7 +613,7 @@ module ahb3lite_debug_bridge
           
           // Set TAR address
           STATE_SET_TAR:
-            if (!ADIv5_INHIBIT)
+            if (!ADIv5_WRFULL)
               begin
                  tar <= ahb_addr;
                  ADIv5_WRDATA <= AP_REG_WRITE (AP_ADDR_TAR, ahb_addr);
@@ -809,7 +626,7 @@ module ahb3lite_debug_bridge
                  // Otherwise we are IRQ scanning.
                  // Select APBANK1 for scanning BDn
                  else
-                   state <= STATE_SELECT_APBANK_1;
+                   state <= STATE_SELECT_APBANK1;
               end
             else
               ADIv5_WREN <= 0;
