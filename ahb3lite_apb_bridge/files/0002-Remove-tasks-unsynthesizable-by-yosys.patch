@@ -1,0 +1,87 @@
+From 2d7f887fd8933d4c6b19504371a21ff335b19cfd Mon Sep 17 00:00:00 2001
+From: Tiny Labs Inc <elliot@tinylabs.io>
+Date: Fri, 12 Aug 2022 10:46:15 -0600
+Subject: [PATCH] Remove tasks, unsynthesizable by yosys
+
+---
+ rtl/verilog/ahb3lite_apb_bridge.sv | 48 ++++++++++++++----------------
+ 1 file changed, 22 insertions(+), 26 deletions(-)
+
+diff --git a/rtl/verilog/ahb3lite_apb_bridge.sv b/rtl/verilog/ahb3lite_apb_bridge.sv
+index 3db1beb..5637366 100644
+--- a/rtl/verilog/ahb3lite_apb_bridge.sv
++++ b/rtl/verilog/ahb3lite_apb_bridge.sv
+@@ -185,26 +185,6 @@ module ahb3lite_apb_bridge #(
+   logic [               9:0] apb_beat_data_offset;
+ 
+ 
+-  //////////////////////////////////////////////////////////////////
+-  //
+-  // Tasks
+-  //
+-  task ahb_no_transfer;
+-     ahb_fsm   <= ST_AHB_IDLE;
+-
+-     HREADYOUT <= 1'b1;
+-     HRESP     <= HRESP_OKAY;
+-  endtask //ahb_no_transfer
+-
+-
+-  task ahb_prep_transfer;
+-     ahb_fsm    <= ST_AHB_TRANSFER;
+-
+-     HREADYOUT  <= 1'b0; //hold off master
+-     HRESP      <= HRESP_OKAY;
+-     ahb_treq   <= 1'b1; //request data transfer
+-  endtask //ahb_prep_transfer
+-
+ 
+   //////////////////////////////////////////////////////////////////
+   //
+@@ -214,7 +194,7 @@ module ahb3lite_apb_bridge #(
+     input [2:0] hsize;
+ 
+     case (hsize)
+-       HSIZE_B1024: apb_beats = 7'(1023/PDATA_SIZE); 
++       HSIZE_B1024: apb_beats = 7'(1023/PDATA_SIZE);
+        HSIZE_B512 : apb_beats = 7'(511/PDATA_SIZE);
+        HSIZE_B256 : apb_beats = 7'(255/PDATA_SIZE);
+        HSIZE_B128 : apb_beats = 7'(127/PDATA_SIZE);
+@@ -323,13 +303,29 @@ module ahb3lite_apb_bridge #(
+                     * This (slave) is selected ... what kind of transfer is this?
+                     */
+                    case (HTRANS)
+-                      HTRANS_IDLE  : ahb_no_transfer;
+-                      HTRANS_BUSY  : ahb_no_transfer;
+-                      HTRANS_NONSEQ: ahb_prep_transfer;
+-                      HTRANS_SEQ   : ahb_prep_transfer;
++                      HTRANS_IDLE  :
++                      HTRANS_BUSY  :
++                        begin
++                           ahb_fsm   <= ST_AHB_IDLE;
++                           HREADYOUT <= 1'b1;
++                           HRESP     <= HRESP_OKAY;
++                        end
++                      HTRANS_NONSEQ:
++                      HTRANS_SEQ   :
++                        begin
++                           ahb_fsm    <= ST_AHB_TRANSFER;
++                           HREADYOUT  <= 1'b0; //hold off master
++                           HRESP      <= HRESP_OKAY;
++                           ahb_treq   <= 1'b1; //request data transfer
++                        end
+                    endcase //HTRANS
+                end
+-               else ahb_no_transfer;
++               else
++                 begin
++                    ahb_fsm   <= ST_AHB_IDLE;
++                    HREADYOUT <= 1'b1;
++                    HRESP     <= HRESP_OKAY;
++                 end
+            end
+ 
+            ST_AHB_TRANSFER:
+-- 
+2.34.1
+

@@ -194,6 +194,7 @@ module cm3_min_soc
                .CLK       (CLK),
                .RESETn    (PORESETn),
                .HSEL      (ahb3_default_slave_HSEL),
+               .HADDR     (ahb3_default_slave_HADDR),
                .HTRANS    (ahb3_default_slave_HTRANS),
                .HREADY    (ahb3_default_slave_HREADY),
                .HREADYOUT (ahb3_default_slave_HREADYOUT),
