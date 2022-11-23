@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 #include <verilated.h>
-#include <verilated_vcd_c.h>
+#include <verilated_fst_c.h>
 #include "JTAGServer.h"
 #include "UARTServer.h"
 #include "JTAGClient.h"
@@ -17,13 +17,13 @@ public:
   VerilatorUtils(uint32_t *mem=NULL);
   ~VerilatorUtils();
 
-  VerilatedVcdC* tfp;
+  VerilatedFstC* tfp;
 
-  JTAGServer *jtag_server;
-  UARTServer *uart_server;
-  JTAGClient *jtag_client;
-  GPIOClient *gpio_client;
-  GPIOServer *gpio_server;
+  JTAGServer *jtag_server = NULL;
+  UARTServer *uart_server = NULL;
+  JTAGClient *jtag_client = NULL;
+  GPIOClient *gpio_client = NULL;
+  GPIOServer *gpio_server = NULL;
   
   bool doCycle();
   bool doGPIOServer (uint64_t *input, size_t input_cnt, uint64_t output, size_t output_cnt);
@@ -33,10 +33,10 @@ public:
   bool doJTAGClient (uint8_t tck, uint8_t *tdo, uint8_t tdi, uint8_t *tms, uint8_t tmsoe = true);
   uint64_t getTime() { return t; }
   uint64_t getTimeout() { return timeout; }
-  bool getVcdDump() { return vcdDump; }
-  uint64_t getVcdDumpStart() { return vcdDumpStart; }
-  uint64_t getVcdDumpStop() { return vcdDumpStop; }
-  char *getVcdFileName() { return vcdFileName; }
+  bool getFstDump() { return fstDump; }
+  uint64_t getFstDumpStart() { return fstDumpStart; }
+  uint64_t getFstDumpStop() { return fstDumpStop; }
+  char *getFstFileName() { return fstFileName; }
   bool getJtagEnable() { return jtagServerEnable; }
   int getJtagPort() { return jtagServerPort; }
 
@@ -46,11 +46,11 @@ private:
   uint64_t t;
   uint64_t timeout;
 
-  bool vcdDump;
-  uint64_t vcdDumpStart;
-  uint64_t vcdDumpStop;
-  char *vcdFileName;
-  bool vcdDumping;
+  bool fstDump;
+  uint64_t fstDumpStart;
+  uint64_t fstDumpStop;
+  char *fstFileName;
+  bool fstDumping;
 
   bool jtagServerEnable;
   int jtagServerPort;

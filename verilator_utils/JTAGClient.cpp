@@ -42,50 +42,40 @@ void JTAGClient::Stop (void)
 
 void JTAGClient::doJTAGClient (uint64_t t, uint8_t tck, uint8_t *tdo, uint8_t tdi, uint8_t *tms, uint8_t tmsoe)
 {
-  static uint8_t pclk = 0;
   uint8_t b;
   int rv;
-
   
-  // JTAG clk is divided from sys clk
-  // Only need action on transitions
-  if (tck != pclk) {
-
-    // Write JTAGIO state
-    b = '0' | (tck << 2) | (*tms << 1) | tdi;
-    rv = write (jtagsock, &b, 1);
-    if (rv != 1)
+  // Write JTAGIO state
+  b = '0' | (tck << 2) | (*tms << 1) | tdi;
+  rv = write (jtagsock, &b, 1);
+  if (rv != 1)
       fail ("JTAGClient IO error");
     
-    // Query TDI/TMS state
-    b = 'S';
-    rv = write (jtagsock, &b, 1);
-    if (rv != 1)
+  // Query TDO/TMS state
+  b = 'S';
+  rv = write (jtagsock, &b, 1);
+  if (rv != 1)
       fail ("JTAGClient IO error");
 
-    // Read state
-    rv = read (jtagsock, &b, 1);
-    if (rv != 1)
+  // Read state
+  rv = read (jtagsock, &b, 1);
+  if (rv != 1)
       fail ("JTAGClient IO error");
 
-    // Get TDO
-    if ((b - '0') & 1)
+  // Get TDO
+  if ((b - '0') & 1)
       *tdo = 1;
-    else
+  else
       *tdo = 0;
     
-    // Read from remote
-    if (!tmsoe) {
+  // Read from remote
+  if (!tmsoe) {
 
       // Set tms/SWDIN
       if ((b - '0') & 2)
-        *tms = 1;
+          *tms = 1;
       else
-        *tms = 0;
-    }
-
-    // Save clock
-    pclk = tck;
+          *tms = 0;
   }
 }
 

@@ -6,40 +6,47 @@
 #include <elf-loader.h>
 #include "verilator_utils.h"
 
-#define VCD_DEFAULT_NAME "../sim.vcd"
+#define FST_DEFAULT_NAME "../sim.fst"
 
 VerilatorUtils::VerilatorUtils(uint32_t *mem)
-  : mem(mem), t(0), timeout(0), vcdDump(false), vcdDumpStart(0), vcdDumpStop(0),
-    vcdFileName((char *)VCD_DEFAULT_NAME),
+  : mem(mem), t(0), timeout(0), fstDump(false), fstDumpStart(0), fstDumpStop(0),
+    fstFileName((char *)FST_DEFAULT_NAME),
     jtagServerEnable(false), jtagServerPort(2345),
     jtagClientEnable(false), jtagClientPort(2345),
     uartServerEnable(false), uartServerPort(7777),
     gpioServerEnable(false), gpioServerPort(8888),
     gpioClientEnable(false), gpioClientPort(8888)
 {
-  tfp = new VerilatedVcdC;
+  tfp = new VerilatedFstC;
 
   // Instantiate services
-  jtag_server = new JTAGServer (4);
+  jtag_server = new JTAGServer (8);
   uart_server = new UARTServer (4);
   jtag_client = new JTAGClient (1);
   gpio_server = new GPIOServer (2);
   gpio_client = new GPIOClient (2);
 
-  // Enable tracing by default
+  // Enable tracing
   Verilated::traceEverOn(true);
-  printf("Tracing on\n");
 }
 
 VerilatorUtils::~VerilatorUtils() {
-    if (vcdDumping)
-      tfp->close();
-    // Stop JTAG server
-    delete jtag_server;
-    delete uart_server;
-    delete jtag_client;
-    delete gpio_client;
-    delete gpio_server;
+    if (fstDumping && tfp->isOpen()) {
+        tfp->flush();
+        tfp->close();
+    }
+    
+    // Stop remote servers/clients
+    if (jtag_server)
+        delete jtag_server;
+    if (uart_server)
+        delete uart_server;
+    if (jtag_client)
+        delete jtag_client;
+    if (gpio_client)
+        delete gpio_client;
+    if (gpio_server)
+        delete gpio_server;
 }
 
 bool VerilatorUtils::doJTAGServer (uint8_t *tck, uint8_t tdo, uint8_t *tdi, uint8_t *tms, uint8_t *srst) {
@@ -80,21 +87,22 @@ bool VerilatorUtils::doGPIOClient (uint64_t *input, size_t input_cnt, uint64_t o
 }
 
 bool VerilatorUtils::doCycle() {
-  if (vcdDumpStop && t >= vcdDumpStop) {
-    if (vcdDumping) {
-      printf("VCD dump stopped (%lu)\n", t);
+  if (fstDumpStop && t >= fstDumpStop) {
+    if (fstDumping) {
+      printf("FST dump stopped (%lu)\n", t);
+      tfp->flush();
       tfp->close();
     }
-    vcdDumping = false;
-  } else if (vcdDump && t >= vcdDumpStart) {
-    if (!vcdDumping) {
-      printf("VCD dump started (%lu)\n", t);
-      tfp->open(vcdFileName);
+    fstDumping = false;
+  } else if (fstDump && t >= fstDumpStart) {
+    if (!fstDumping) {
+      printf("FST dump started (%lu)\n", t);
+      tfp->open(fstFileName);
     }
-    vcdDumping = true;
+    fstDumping = true;
   }
 
-  if (vcdDumping)
+  if (fstDumping)
     tfp->dump((vluint64_t)t);
 
   if(timeout && t >= timeout) {
@@ -104,6 +112,8 @@ bool VerilatorUtils::doCycle() {
 
   if (Verilated::gotFinish()) {
     printf("Caught $finish()\n");
+    tfp->flush();
+    tfp->close();
     return false;
   }
 
@@ -161,10 +171,10 @@ static struct argp_option options[] = {
   { "timeout", OPT_TIMEOUT, "VAL", 0, "Stop the sim at VAL" },
   { "elf-load", OPT_ELFLOAD, "FILE", 0, "Load program from ELF FILE" },
   { "bin-load", OPT_BINLOAD, "FILE", 0, "Load program from binary FILE" },
-  { 0, 0, 0, 0, "VCD generation:", 2 },
-  { "vcd", 'v', "FILE", OPTION_ARG_OPTIONAL, "Enable and save VCD to FILE" },
-  { "vcdstart", 's', "VAL", 0, "Delay VCD generation until VAL" },
-  { "vcdstop", 't', "VAL", 0, "Terminate VCD generation at VAL" },
+  { 0, 0, 0, 0, "FST generation:", 2 },
+  { "fst", 'f', "FILE", OPTION_ARG_OPTIONAL, "Enable and save FST to FILE" },
+  { "fststart", 's', "VAL", 0, "Delay FST generation until VAL" },
+  { "fststop", 't', "VAL", 0, "Terminate FST generation at VAL" },
   { 0, 0, 0, 0, "Remote debugging:", 3 },
   { "jtag-server", 'j', "PORT", OPTION_ARG_OPTIONAL, "Enable openocd JTAG server, opt. specify PORT" },
   { "jtag-client", 'r', "PORT", OPTION_ARG_OPTIONAL, "Connect to remote JTAG server opt. specify PORT" },
@@ -195,18 +205,18 @@ int VerilatorUtils::parseOpts(int key, char *arg, struct argp_state *state) {
     utils->loadBin(arg);
     break;
 
-  case 'v':
-    utils->vcdDump = true;
+  case 'f':
+    utils->fstDump = true;
     if (arg)
-      utils->vcdFileName = arg;
+      utils->fstFileName = arg;
     break;
 
   case 's':
-    utils->vcdDumpStart = strtol(arg, NULL, 10);
+    utils->fstDumpStart = strtol(arg, NULL, 10);
     break;
 
   case 't':
-    utils->vcdDumpStop = strtol(arg, NULL, 10);
+    utils->fstDumpStop = strtol(arg, NULL, 10);
     break;
 
   case 'j':
