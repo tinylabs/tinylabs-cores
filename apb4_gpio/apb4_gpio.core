@@ -21,3 +21,4 @@ provider:
     name : github
     user : RoaLogic
     repo : apb4_gpio
+    version : master

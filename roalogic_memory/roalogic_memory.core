@@ -28,6 +28,7 @@ provider:
     name : github
     user : RoaLogic
     repo : memory
+    version : master
     patches : [files/0001-Remove-verilator-param-lint-error.patch,
                files/0002-Make-RAM-array-verilator-public.patch]
                
