@@ -2,7 +2,18 @@ CAPI=2:
 name: ::cm3_obs:1.0
 description: Cortex-M3 obsfucated synthesizable RTL
 
+scripts:
+    check_source:
+        cmd:
+            - /bin/sh
+            - check_source.sh
+        filesets: [check_source]
+
 filesets:
+    check_source:
+        files:
+            - scripts/check_source.sh : {file_type: user, copyto: check_source.sh}
+
     rtl:
         files:
             - m3designstart/logical/cortexm3integration_ds/verilog/cm3_code_mux.v
@@ -12,13 +23,19 @@ filesets:
 
 targets:
     default:
-        filesets : [rtl]
+        generate: [prepare_cm3_source]
+        filesets : [rtl, check_source]
+        hooks:
+            pre_build:
+               - check_source
 
-provider:
-    name : github
-    user : Grekery
-    repo : AT421-MN-80001-r0p0-02rel0
-    version: master
-    patches : [files/0001-Remove-verilator-warnings.patch,
-               files/0002-Remove-async-reset.patch]
+generate:
+    prepare_cm3_source:
+        generator: prepare_source
+
+generators:
+    prepare_source:
+        interpreter: python3
+        command: scripts/prepare_source.py
+
     
